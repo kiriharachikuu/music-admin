@@ -7,12 +7,13 @@ import { getToken, clearAuth } from "./auth";
 
 // XingTone管理后台 axios 实例
 // baseURL 由环境变量 NEXT_PUBLIC_API_BASE 配置，默认指向本地后端
+// 不预设默认 Content-Type：让 axios 按数据类型自动设置
+// - 普通对象 → application/json
+// - FormData → multipart/form-data（浏览器自动加 boundary）
+// 预设 application/json 会导致 FormData 请求 Content-Type 不被覆盖，后端 multer 解析失败
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000/api",
   timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // 后端统一响应格式：{ code, data, message }
