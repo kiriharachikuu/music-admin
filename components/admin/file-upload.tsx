@@ -55,12 +55,10 @@ export function FileUpload({
       try {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("type", type);
         const data = await request<UploadResult>({
           method: "POST",
-          url: "/admin/upload",
+          url: `/admin/upload?type=${type}`,
           data: formData,
-          headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (e) => {
             if (e.total) {
               setProgress(Math.round((e.loaded * 100) / e.total));

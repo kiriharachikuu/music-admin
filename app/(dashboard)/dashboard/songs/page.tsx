@@ -144,7 +144,12 @@ export default function SongsPage() {
           albumId: albumFilter !== "ALL" ? albumFilter : undefined,
         },
       });
-      setData(res.list ?? []);
+      // 后端返回 songTags 关联表，映射为前端期望的 tags 数组
+      const mapped = (res.list ?? []).map((s) => ({
+        ...s,
+        tags: s.songTags?.map((st) => st.tag) ?? [],
+      }));
+      setData(mapped);
       setTotal(res.total ?? 0);
     } catch (err) {
       toast({
@@ -984,12 +989,10 @@ function BatchUploadDialog({
       update({ status: "uploading", progress: 0 });
       const formData = new FormData();
       formData.append("file", task.file);
-      formData.append("type", "audio");
       const uploadRes = await request<{ url: string }>({
         method: "POST",
-        url: "/admin/upload",
+        url: "/admin/upload?type=audio",
         data: formData,
-        headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => {
           if (e.total) {
             update({

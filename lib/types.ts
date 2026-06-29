@@ -59,6 +59,8 @@ export interface Song {
   releaseDate: string;
   plays: number;
   status: SongStatus;
+  /** 后端返回的关联表结构，前端映射为 tags */
+  songTags?: { tag: Tag }[];
   tags?: Tag[];
   createdAt: string;
   updatedAt: string;
