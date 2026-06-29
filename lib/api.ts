@@ -40,8 +40,8 @@ api.interceptors.response.use(
     const result = response.data as ApiResult;
     // 仅处理后端标准格式 { code, data, message }
     if (result && typeof result === "object" && "code" in result) {
-      // code === 0 视为成功，直接返回 data
-      if (result.code === 0) {
+      // 后端 code 为 HTTP 状态码，2xx 视为成功，直接返回 data
+      if (result.code >= 200 && result.code < 300) {
         // 拦截器解包后，调用方拿到的即为业务数据 data
         return result.data as unknown as typeof response;
       }
