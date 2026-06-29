@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -244,25 +245,23 @@ export default function PlaylistsPage() {
         searchPlaceholder="搜索歌单名 / 创建者"
       />
 
-      {formOpen && (
-        <PlaylistFormDialog
-          open={formOpen}
-          onOpenChange={(o) => {
-            setFormOpen(o);
-            if (!o) {
-              setEditing(null);
-              setSelectedRowKey(null);
-            }
-          }}
-          editing={editing}
-          onSuccess={() => {
-            setFormOpen(false);
+      <PlaylistFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) {
             setEditing(null);
             setSelectedRowKey(null);
-            void loadList();
-          }}
-        />
-      )}
+          }
+        }}
+        editing={editing}
+        onSuccess={() => {
+          setFormOpen(false);
+          setEditing(null);
+          setSelectedRowKey(null);
+          void loadList();
+        }}
+      />
 
       {/* 管理歌曲弹窗 */}
       {songsTarget && (
@@ -373,6 +372,9 @@ function PlaylistFormDialog({
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "编辑歌单" : "新增歌单"}</DialogTitle>
+          <DialogDescription>
+            {editing ? "修改歌单信息并保存" : "填写歌单信息并上传封面"}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -600,6 +602,7 @@ function PlaylistSongsDialog({
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>管理歌曲 - {playlist.name}</DialogTitle>
+          <DialogDescription>添加或移除歌单内的歌曲</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {/* 添加歌曲区 */}

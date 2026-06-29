@@ -18,7 +18,7 @@ export interface FileUploadProps {
   // 接受的文件类型，默认图片
   accept?: string;
   // 上传类型，传给后端 type 字段
-  type?: "image" | "audio";
+  type?: "image" | "audio" | "lyric";
   // 预览类型：图片显示缩略图，音频显示播放器，文件显示通用文件卡
   preview?: "image" | "audio" | "file";
   // 自定义类名

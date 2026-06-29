@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -212,25 +213,23 @@ export default function AlbumsPage() {
         searchPlaceholder="搜索专辑名 / 艺术家"
       />
 
-      {formOpen && (
-        <AlbumFormDialog
-          open={formOpen}
-          onOpenChange={(o) => {
-            setFormOpen(o);
-            if (!o) {
-              setEditing(null);
-              setSelectedRowKey(null);
-            }
-          }}
-          editing={editing}
-          onSuccess={() => {
-            setFormOpen(false);
+      <AlbumFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) {
             setEditing(null);
             setSelectedRowKey(null);
-            void loadList();
-          }}
-        />
-      )}
+          }
+        }}
+        editing={editing}
+        onSuccess={() => {
+          setFormOpen(false);
+          setEditing(null);
+          setSelectedRowKey(null);
+          void loadList();
+        }}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -329,6 +328,9 @@ function AlbumFormDialog({
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "编辑专辑" : "新增专辑"}</DialogTitle>
+          <DialogDescription>
+            {editing ? "修改专辑信息并保存" : "填写专辑信息并上传封面"}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

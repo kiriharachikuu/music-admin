@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -325,25 +326,23 @@ export default function BannersPage() {
         showPagination={total > pageSize}
       />
 
-      {formOpen && (
-        <BannerFormDialog
-          open={formOpen}
-          onOpenChange={(o) => {
-            setFormOpen(o);
-            if (!o) {
-              setEditing(null);
-              setSelectedRowKey(null);
-            }
-          }}
-          editing={editing}
-          onSuccess={() => {
-            setFormOpen(false);
+      <BannerFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) {
             setEditing(null);
             setSelectedRowKey(null);
-            void loadList();
-          }}
-        />
-      )}
+          }
+        }}
+        editing={editing}
+        onSuccess={() => {
+          setFormOpen(false);
+          setEditing(null);
+          setSelectedRowKey(null);
+          void loadList();
+        }}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -442,6 +441,9 @@ function BannerFormDialog({
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "编辑 Banner" : "新增 Banner"}</DialogTitle>
+          <DialogDescription>
+            {editing ? "修改 Banner 信息并保存" : "填写 Banner 信息并上传图片"}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

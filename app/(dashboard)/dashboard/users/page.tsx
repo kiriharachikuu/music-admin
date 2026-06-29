@@ -74,19 +74,18 @@ export default function UsersPage() {
     setPage(1);
   }, [debouncedKeyword]);
 
-  // 禁用 / 启用切换（基于软删除）
+  // 禁用 / 启用切换（基于软删除 deletedAt）
+  // 后端契约：PUT /api/admin/users/:id/status，body { disabled: boolean }
   async function handleToggleDisabled(user: User) {
     setTogglingId(user.id);
     try {
-      if (user.deletedAt) {
-        // 已禁用 → 恢复
-        await request({ method: "PUT", url: `/admin/users/${user.id}/restore` });
-        toast({ title: "已启用" });
-      } else {
-        // 正常 → 禁用（软删除）
-        await request({ method: "DELETE", url: `/admin/users/${user.id}` });
-        toast({ title: "已禁用" });
-      }
+      const disabled = !user.deletedAt;
+      await request({
+        method: "PUT",
+        url: `/admin/users/${user.id}/status`,
+        data: { disabled },
+      });
+      toast({ title: disabled ? "已禁用" : "已启用" });
       void loadList();
     } catch (err) {
       toast({
@@ -106,7 +105,7 @@ export default function UsersPage() {
     try {
       await request({
         method: "PUT",
-        url: `/admin/users/${roleTarget.id}`,
+        url: `/admin/users/${roleTarget.id}/role`,
         data: { role: next },
       });
       toast({

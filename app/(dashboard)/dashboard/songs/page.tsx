@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -374,28 +375,26 @@ export default function SongsPage() {
         }
       />
 
-      {/* 新增/编辑弹窗 */}
-      {formOpen && (
-        <SongFormDialog
-          open={formOpen}
-          onOpenChange={(o) => {
-            setFormOpen(o);
-            if (!o) {
-              setEditing(null);
-              setSelectedRowKey(null);
-            }
-          }}
-          editing={editing}
-          albums={albums}
-          tags={tags}
-          onSuccess={() => {
-            setFormOpen(false);
+      {/* 新增/编辑弹窗：始终挂载，仅用 open 控制开关，避免条件挂载与受控 open 叠加导致的生命周期异常 */}
+      <SongFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) {
             setEditing(null);
             setSelectedRowKey(null);
-            void loadList();
-          }}
-        />
-      )}
+          }
+        }}
+        editing={editing}
+        albums={albums}
+        tags={tags}
+        onSuccess={() => {
+          setFormOpen(false);
+          setEditing(null);
+          setSelectedRowKey(null);
+          void loadList();
+        }}
+      />
 
       {/* 批量上传弹窗 */}
       <BatchUploadDialog
@@ -605,6 +604,11 @@ function SongFormDialog({
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "编辑歌曲" : "新增歌曲"}</DialogTitle>
+          <DialogDescription>
+            {editing
+              ? "修改歌曲信息并保存"
+              : "填写歌曲信息、上传音频文件后提交"}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -847,7 +851,7 @@ function SongFormDialog({
                       <FileUpload
                         value={field.value}
                         onChange={field.onChange}
-                        type="audio"
+                        type="lyric"
                         accept=".lrc,.txt"
                         preview="file"
                         hint="支持 .lrc / .txt"
@@ -1053,6 +1057,9 @@ function BatchUploadDialog({
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>批量上传歌曲</DialogTitle>
+          <DialogDescription>
+            拖入多个音频文件，自动读取元信息并创建草稿
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {/* 拖拽区 */}
