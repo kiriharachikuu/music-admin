@@ -56,6 +56,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -863,9 +864,9 @@ function SongFormDialog({
               />
             </div>
 
-            {/* 标签多选：chip 切换 */}
-            <FormItem>
-              <FormLabel>标签</FormLabel>
+            {/* 标签多选：chip 切换（不依赖 react-hook-form 字段，使用普通 div+Label） */}
+            <div className="space-y-2">
+              <Label>标签</Label>
               <div className="flex flex-wrap gap-2 rounded-md border border-input p-3 min-h-[42px]">
                 {tags.length === 0 && (
                   <span className="text-sm text-muted-foreground">暂无标签</span>
@@ -889,7 +890,7 @@ function SongFormDialog({
                   );
                 })}
               </div>
-            </FormItem>
+            </div>
 
             <DialogFooter>
               <Button
