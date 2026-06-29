@@ -30,7 +30,7 @@ import {
 
 // 登录表单校验规则
 const loginSchema = z.object({
-  username: z.string().min(1, { message: "请输入用户名" }),
+  account: z.string().min(1, { message: "请输入用户名或邮箱" }),
   password: z
     .string()
     .min(1, { message: "请输入密码" })
@@ -58,7 +58,7 @@ function LoginCard() {
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { account: "", password: "" },
   });
 
   async function onSubmit(values: LoginFormValues) {
@@ -102,13 +102,13 @@ function LoginCard() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="username"
+              name="account"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>用户名</FormLabel>
+                  <FormLabel>用户名或邮箱</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="请输入用户名"
+                      placeholder="请输入用户名或邮箱"
                       autoComplete="username"
                       disabled={submitting}
                       {...field}
