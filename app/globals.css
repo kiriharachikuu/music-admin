@@ -2,26 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ============================================================
+   XingTone管理后台 全局样式
+   - 亮/暗双模式：亮色 gray-50 背景 / 白卡片；暗色 gray-950 背景 / gray-900 卡片
+   - 主色「星瞳紫」#8B00FF（primary-700），primary 色阶在 tailwind.config.ts 定义
+   - 焦点环 ring 使用星瞳紫，呼应品牌色
+   ============================================================ */
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* 亮色：浅灰背景 + 白卡片（Apple Music 风格） */
+    --background: 0 0% 98%;            /* gray-50 */
+    --foreground: 0 0% 3.9%;           /* near black */
+    --card: 0 0% 100%;                 /* 纯白卡片 */
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+
+    /* primary 走 tailwind 色阶，变量保留以便焦点环等场景使用 */
+    --primary: 273 100% 50%;           /* 星瞳紫 #8B00FF */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 271 91% 65%;               /* primary-500 焦点环 */
+
+    /* 图表配色：星瞳紫渐变色阶 */
+    --chart-1: 273 100% 50%;
+    --chart-2: 271 76% 56%;
+    --chart-3: 271 91% 65%;
+    --chart-4: 280 85% 70%;
+    --chart-5: 270 60% 45%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* 暗色：深黑背景 + 深灰卡片 */
+    --background: 0 0% 3.9%;           /* gray-950 ≈ #0a0a0a */
+    --foreground: 0 0% 98%;
+    --card: 0 0% 9%;                   /* gray-900 ≈ #171717 */
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 273 100% 50%;           /* 星瞳紫在暗色下保持不变 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 273 95% 75%;               /* primary-400，暗色下焦点环更亮 */
+
+    --chart-1: 273 100% 65%;
+    --chart-2: 271 76% 66%;
+    --chart-3: 271 91% 75%;
+    --chart-4: 280 85% 80%;
+    --chart-5: 270 60% 55%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* 字体回退：Geist + 系统字体，保证中文显示 */
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+      "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
 }

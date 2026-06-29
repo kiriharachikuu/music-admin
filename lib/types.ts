@@ -1,0 +1,142 @@
+// XingTone管理后台 - 公共数据类型定义
+// 与后端 { code, data, message } 响应解包后的业务数据结构对齐
+
+/** 通用分页查询参数 */
+export interface PageQuery {
+  page?: number;
+  pageSize?: number;
+  keyword?: string;
+}
+
+/** 通用分页返回结构（后端 list + total + page + pageSize） */
+export interface PageResult<T> {
+  list: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** 文件上传返回结构 */
+export interface UploadResult {
+  url: string;
+}
+
+// ============ 业务实体类型（与 Prisma schema 对齐） ============
+
+export type Role = "USER" | "ADMIN";
+export type SongStatus = "PUBLISHED" | "DRAFT";
+export type BannerStatus = "VISIBLE" | "HIDDEN";
+
+/** 用户 */
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  avatar?: string | null;
+  role: Role;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+/** 标签 */
+export interface Tag {
+  id: string;
+  name: string;
+}
+
+/** 歌曲（含关联字段，用于编辑回显） */
+export interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  albumId?: string | null;
+  album?: { id: string; name: string } | null;
+  duration: number;
+  fileUrl: string;
+  coverUrl?: string | null;
+  lyricUrl?: string | null;
+  releaseDate: string;
+  plays: number;
+  status: SongStatus;
+  tags?: Tag[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 专辑 */
+export interface Album {
+  id: string;
+  name: string;
+  artist: string;
+  cover?: string | null;
+  description?: string | null;
+  releaseDate: string;
+  songCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 歌单 */
+export interface Playlist {
+  id: string;
+  name: string;
+  cover?: string | null;
+  description?: string | null;
+  userId: string;
+  user?: { id: string; username: string; avatar?: string | null } | null;
+  isPublic: boolean;
+  playCount: number;
+  songCount?: number;
+  songs?: Song[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Banner */
+export interface Banner {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl?: string | null;
+  sort: number;
+  status: BannerStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 看板统计 */
+export interface StatsData {
+  totalUsers: number;
+  totalSongs: number;
+  todayPlays: number;
+  totalPlaylists: number;
+  playTrend: { date: string; plays: number }[];
+  topSongs: {
+    id: string;
+    title: string;
+    artist: string;
+    coverUrl?: string | null;
+    plays: number;
+  }[];
+}
+
+/** 系统设置（key-value 平铺为对象） */
+export interface SystemSettings {
+  siteTitle?: string;
+  logoUrl?: string;
+  icp?: string;
+  copyright?: string;
+  seoKeywords?: string;
+  seoDescription?: string;
+  storageType?: "local" | "s3";
+  s3Endpoint?: string;
+  s3Bucket?: string;
+  s3AccessKey?: string;
+  s3SecretKey?: string;
+  s3Region?: string;
+  s3PublicDomain?: string;
+  allowRegister?: boolean;
+  defaultQuality?: "standard" | "high" | "lossless";
+  [key: string]: unknown;
+}
