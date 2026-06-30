@@ -1001,6 +1001,8 @@ function BatchUploadDialog({
         method: "POST",
         url: "/admin/upload?type=audio",
         data: formData,
+        // 批量上传音频文件可能较大，覆盖全局 timeout 为 10 分钟
+        timeout: 600000,
         onUploadProgress: (e) => {
           if (e.total) {
             update({

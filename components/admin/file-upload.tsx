@@ -59,6 +59,8 @@ export function FileUpload({
           method: "POST",
           url: `/admin/upload?type=${type}`,
           data: formData,
+          // 文件上传可能较大，覆盖全局 timeout 为 5 分钟
+          timeout: 300000,
           onUploadProgress: (e) => {
             if (e.total) {
               setProgress(Math.round((e.loaded * 100) / e.total));
