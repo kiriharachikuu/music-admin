@@ -8,7 +8,7 @@ import { FileAudio, File as FileIcon, Image as ImageIcon, Loader2, UploadCloud, 
 import { request } from "@/lib/api";
 import type { UploadResult } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, resolveMediaUrl } from "@/lib/utils";
 
 export interface FileUploadProps {
   // 已上传文件 URL（受控）
@@ -105,7 +105,7 @@ export function FileUpload({
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border/60">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={value}
+              src={resolveMediaUrl(value)}
               alt="预览"
               className="h-full w-full object-cover"
               onError={(e) => {

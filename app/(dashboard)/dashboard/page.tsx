@@ -16,6 +16,7 @@ import {
 import { ListMusic, Music, Play, Users } from "lucide-react";
 
 import { request } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 import type { StatsData } from "@/lib/types";
 import { PageHeader } from "@/components/admin/page-header";
 import { StatCard } from "@/components/admin/stat-card";
@@ -230,10 +231,10 @@ export default function DashboardPage() {
                     {song.coverUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={song.coverUrl}
-                        alt={song.title}
-                        className="h-full w-full object-cover"
-                      />
+                src={resolveMediaUrl(song.coverUrl)}
+                alt={song.title}
+                className="h-full w-full object-cover"
+              />
                     )}
                   </div>
                   {/* 歌名 + 歌手 */}

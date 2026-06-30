@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Shield, ShieldOff } from "lucide-react";
 
 import { request } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 import type { PageResult, Role, User } from "@/lib/types";
 import { formatDateTime, useDebounced } from "@/lib/admin-utils";
 import { useToast } from "@/hooks/use-toast";
@@ -129,7 +130,7 @@ export default function UsersPage() {
       width: 56,
       render: (row) => (
         <Avatar className="h-9 w-9">
-          {row.avatar && <AvatarImage src={row.avatar} alt={row.username} />}
+          {row.avatar && <AvatarImage src={resolveMediaUrl(row.avatar)} alt={row.username} />}
           <AvatarFallback className="bg-primary-700 text-xs text-white">
             {row.username.charAt(0).toUpperCase()}
           </AvatarFallback>

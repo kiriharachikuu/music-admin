@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { request } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 import type { Banner, BannerStatus, PageResult } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
@@ -193,10 +194,10 @@ export default function BannersPage() {
         <div className="h-10 w-20 overflow-hidden rounded-md bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={row.imageUrl}
-            alt={row.title}
-            className="h-full w-full object-cover"
-          />
+          src={resolveMediaUrl(row.imageUrl)}
+          alt={row.title}
+          className="h-full w-full object-cover"
+        />
         </div>
       ),
     },

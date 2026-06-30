@@ -64,7 +64,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { cn, resolveMediaUrl } from "@/lib/utils";
 
 // "无专辑"哨兵值，提交时转 null
 const NO_ALBUM = "__none__";
@@ -243,9 +243,12 @@ export default function SongsPage() {
           {row.coverUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={row.coverUrl}
+              src={resolveMediaUrl(row.coverUrl)}
               alt={row.title}
               className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
           )}
         </div>
@@ -808,7 +811,7 @@ function SongFormDialog({
                         {field.value ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={field.value}
+                            src={resolveMediaUrl(field.value)}
                             alt="专辑封面"
                             className="h-full w-full object-cover"
                             onError={(e) => {

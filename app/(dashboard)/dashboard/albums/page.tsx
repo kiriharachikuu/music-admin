@@ -11,6 +11,7 @@ import { z } from "zod";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { request } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 import type { Album, PageResult } from "@/lib/types";
 import { formatDate, useDebounced } from "@/lib/admin-utils";
 import { useToast } from "@/hooks/use-toast";
@@ -134,7 +135,7 @@ export default function AlbumsPage() {
           {row.cover && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={row.cover}
+              src={resolveMediaUrl(row.cover)}
               alt={row.name}
               className="h-full w-full object-cover"
             />
