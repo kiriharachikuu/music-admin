@@ -119,7 +119,7 @@ export function FileUpload({
               <FileAudio className="h-4 w-4 text-primary-700" />
               <span className="truncate">音频文件</span>
             </div>
-            <audio controls src={value} className="h-8 w-full" />
+            <audio controls src={resolveMediaUrl(value)} className="h-8 w-full" />
           </div>
         ) : (
           <div className="flex h-20 w-44 shrink-0 flex-col justify-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-3">
