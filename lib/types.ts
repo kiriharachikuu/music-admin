@@ -142,3 +142,23 @@ export interface SystemSettings {
   defaultQuality?: "standard" | "high" | "lossless";
   [key: string]: unknown;
 }
+
+/** App版本 */
+export interface AppVersion {
+  id: string;
+  versionCode: number;
+  versionName: string;
+  title?: string | null;
+  content?: string | null;
+  downloadUrl: string;
+  fileSize: number;
+  md5?: string | null;
+  forceUpdate: boolean;
+  minVersionCode: number;
+  channel: string;
+  platform: string;
+  status: string;
+  downloadCount: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -57,3 +57,16 @@ export function useDebounced<T>(value: T, delay = 300): T {
   }, [value, delay]);
   return debounced;
 }
+
+/** 文件大小格式化：字节 → KB/MB/GB */
+export function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let size = bytes;
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024;
+    i++;
+  }
+  return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
