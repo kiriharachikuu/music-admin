@@ -476,7 +476,7 @@ function BannerFormDialog({
                       type="image"
                       accept="image/*"
                       preview="image"
-                      hint="建议宽幅横图，拖拽或点击上传"
+                      hint="建议尺寸 1920×500（宽高比 ~ 3.8:1），宽幅横图，支持 JPG/PNG/WebP，≤ 10MB"
                     />
                   </FormControl>
                   <FormMessage />

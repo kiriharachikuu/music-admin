@@ -56,6 +56,8 @@ export interface Song {
   fileUrl: string;
   coverUrl?: string | null;
   lyricUrl?: string | null;
+  /** 歌词正文（LRC 文本），优先于 lyricUrl */
+  lyricContent?: string | null;
   releaseDate: string;
   plays: number;
   status: SongStatus;

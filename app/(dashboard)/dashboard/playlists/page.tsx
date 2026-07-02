@@ -229,6 +229,17 @@ export default function PlaylistsPage() {
       <PageHeader
         title="歌单管理"
         description="管理用户歌单与歌单内歌曲"
+        actions={
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            新增歌单
+          </Button>
+        }
       />
 
       <DataTable

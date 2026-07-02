@@ -13,11 +13,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ListMusic, Music, Play, Users } from "lucide-react";
+import { ListMusic, Music, Play, Users, Tag } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
-import type { StatsData } from "@/lib/types";
+import type { StatsData, AppVersion } from "@/lib/types";
 import { PageHeader } from "@/components/admin/page-header";
 import { StatCard } from "@/components/admin/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +58,7 @@ function ChartTooltip({
 export default function DashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [latestVersion, setLatestVersion] = useState<AppVersion | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +77,25 @@ export default function DashboardPage() {
         if (!cancelled) setLoading(false);
       }
     }
+
+    // 获取最新已发布版本
+    async function loadVersion() {
+      try {
+        const res = await request<{ list: AppVersion[] }>({
+          method: "GET",
+          url: "/admin/app-versions",
+          params: { limit: 1, status: "published" },
+        });
+        if (!cancelled && res.list?.length > 0) {
+          setLatestVersion(res.list[0]);
+        }
+      } catch {
+        // 静默失败
+      }
+    }
+
     void load();
+    void loadVersion();
     return () => {
       cancelled = true;
     };
@@ -90,10 +109,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="数据看板"
-        description="XingTone平台核心运营指标一览"
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="数据看板"
+          description="XingTone平台核心运营指标一览"
+        />
+        {latestVersion && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary-500/20 bg-primary-500/5 px-3 py-1.5">
+            <Tag className="h-4 w-4 text-primary-700" />
+            <span className="text-xs text-foreground/60">当前版本</span>
+            <span className="text-sm font-semibold text-primary-700">
+              v{latestVersion.versionName}
+            </span>
+            <span className="text-xs text-foreground/40">
+              ({latestVersion.versionCode})
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* 顶部 4 个核心指标卡片 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
