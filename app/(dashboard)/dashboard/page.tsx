@@ -4,6 +4,7 @@
 // 顶部 4 个核心指标卡片 + 七日播放趋势 AreaChart + 热门歌曲 Top10 排行
 // 对接 GET /api/admin/stats
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Area,
   AreaChart,
@@ -13,7 +14,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ListMusic, Music, Play, Users, Tag } from "lucide-react";
+import {
+  ListMusic,
+  Music,
+  Play,
+  Users,
+  Tag,
+  Upload,
+  Image as ImageIcon,
+  Rocket,
+  ArrowRight,
+} from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
@@ -154,6 +165,52 @@ export default function DashboardPage() {
           icon={ListMusic}
           loading={loading}
         />
+      </div>
+
+      {/* 快捷操作入口：上传歌曲 / 添加横幅 / 发布版本 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {(
+          [
+            {
+              href: "/dashboard/songs",
+              icon: Upload,
+              title: "上传歌曲",
+              desc: "新增音频并填写元数据",
+            },
+            {
+              href: "/dashboard/banners",
+              icon: ImageIcon,
+              title: "添加横幅",
+              desc: "配置首页轮播 Banner",
+            },
+            {
+              href: "/dashboard/app-versions",
+              icon: Rocket,
+              title: "发布版本",
+              desc: "发布新版本并推送更新",
+            },
+          ] as const
+        ).map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4 transition-all hover:border-primary-500/40 hover:shadow-md hover:shadow-primary-700/5"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-700/10 text-primary-700 transition-colors group-hover:bg-primary-700 group-hover:text-white">
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {item.desc}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary-700" />
+            </Link>
+          );
+        })}
       </div>
 
       {/* 七日播放趋势图 */}

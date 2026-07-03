@@ -7,13 +7,9 @@
 // 新增/编辑 Dialog（标题/图片上传/链接/排序/状态）+ 删除二次确认
 // 对接 CRUD /api/admin/banners，排序 /api/admin/banners/:id/sort
 import { useCallback, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   ArrowDown,
   ArrowUp,
-  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -26,47 +22,11 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { FileUpload } from "@/components/admin/file-upload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-// Banner 表单校验
-// 注：linkUrl 直接用 z.string()，默认值在 useForm defaultValues 中提供
-// （zod 4 + react-hook-form 对 .optional().default() 的输入/输出类型推断存在不兼容）
-const bannerSchema = z.object({
-  title: z.string().min(1, "请输入标题"),
-  imageUrl: z.string().min(1, "请上传图片"),
-  linkUrl: z.string(),
-  sort: z.number().int("排序需为整数").min(0, "排序需 ≥ 0"),
-  status: z.enum(["VISIBLE", "HIDDEN"]),
-});
-
-type BannerFormValues = z.infer<typeof bannerSchema>;
+import { BannerFormDialog } from "./form-dialog";
 
 export default function BannersPage() {
   const { toast } = useToast();
@@ -204,20 +164,40 @@ export default function BannersPage() {
     { key: "title", title: "标题", render: (row) => <span className="font-medium">{row.title}</span> },
     {
       key: "linkUrl",
-      title: "链接",
-      render: (row) =>
-        row.linkUrl ? (
-          <a
-            href={row.linkUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="truncate text-xs text-primary-700 hover:underline"
-          >
-            {row.linkUrl}
-          </a>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        ),
+      title: "点击行为",
+      render: (row) => {
+        // 优先级：songId 播放 > adUrl 外链 > linkUrl 跳转
+        if (row.songId) {
+          return (
+            <Badge className="bg-primary-700 hover:bg-primary-700">播放歌曲</Badge>
+          );
+        }
+        if (row.adUrl) {
+          return (
+            <a
+              href={row.adUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-xs text-primary-700 hover:underline"
+            >
+              {row.adUrl}
+            </a>
+          );
+        }
+        if (row.linkUrl) {
+          return (
+            <a
+              href={row.linkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-xs text-primary-700 hover:underline"
+            >
+              {row.linkUrl}
+            </a>
+          );
+        }
+        return <span className="text-muted-foreground">-</span>;
+      },
     },
     {
       key: "sort",
@@ -359,213 +339,5 @@ export default function BannersPage() {
         onConfirm={handleDelete}
       />
     </div>
-  );
-}
-
-// ==================== Banner 新增/编辑表单弹窗 ====================
-interface BannerFormDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editing: Banner | null;
-  onSuccess: () => void;
-}
-
-function BannerFormDialog({
-  open,
-  onOpenChange,
-  editing,
-  onSuccess,
-}: BannerFormDialogProps) {
-  const { toast } = useToast();
-  const [submitting, setSubmitting] = useState(false);
-
-  const form = useForm<BannerFormValues>({
-    resolver: zodResolver(bannerSchema),
-    defaultValues: {
-      title: "",
-      imageUrl: "",
-      linkUrl: "",
-      sort: 0,
-      status: "VISIBLE",
-    },
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    if (editing) {
-      form.reset({
-        title: editing.title,
-        imageUrl: editing.imageUrl,
-        linkUrl: editing.linkUrl || "",
-        sort: editing.sort,
-        status: editing.status,
-      });
-    } else {
-      form.reset({
-        title: "",
-        imageUrl: "",
-        linkUrl: "",
-        sort: 0,
-        status: "VISIBLE",
-      });
-    }
-  }, [open, editing, form]);
-
-  async function onSubmit(values: BannerFormValues) {
-    setSubmitting(true);
-    try {
-      if (editing) {
-        await request({
-          method: "PUT",
-          url: `/admin/banners/${editing.id}`,
-          data: values,
-        });
-        toast({ title: "保存成功" });
-      } else {
-        await request({ method: "POST", url: "/admin/banners", data: values });
-        toast({ title: "新增成功" });
-      }
-      onSuccess();
-    } catch (err) {
-      toast({
-        title: "保存失败",
-        description: err instanceof Error ? err.message : "请稍后重试",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editing ? "编辑 Banner" : "新增 Banner"}</DialogTitle>
-          <DialogDescription>
-            {editing ? "修改 Banner 信息并保存" : "填写 Banner 信息并上传图片"}
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>标题</FormLabel>
-                  <FormControl>
-                    <Input placeholder="请输入 Banner 标题" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* 图片上传：拖拽 + 预览 */}
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>图片</FormLabel>
-                  <FormControl>
-                    <FileUpload
-                      value={field.value}
-                      onChange={field.onChange}
-                      type="image"
-                      accept="image/*"
-                      preview="image"
-                      hint="建议尺寸 1920×500（宽高比 ~ 3.8:1），宽幅横图，支持 JPG/PNG/WebP，≤ 10MB"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="linkUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>链接（可选）</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="sort"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>排序</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="数值越小越靠前"
-                        value={field.value}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value === "" ? 0 : Number(e.target.value)
-                          )
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>状态</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="VISIBLE">上架</SelectItem>
-                        <SelectItem value="HIDDEN">下架</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={submitting}
-              >
-                取消
-              </Button>
-              <Button
-                type="submit"
-                className="bg-primary-700 text-white hover:bg-primary-600"
-                disabled={submitting}
-              >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {editing ? "保存" : "新增"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
   );
 }

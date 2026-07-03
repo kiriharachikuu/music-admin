@@ -8,8 +8,8 @@
 // - 其他：注册开关、默认音质（standard/high/lossless）
 // 对接 GET /api/admin/settings、PUT /api/admin/settings
 // 字段异构且多为可选，采用受控 useState（不引入 react-hook-form）
-import { useEffect, useRef, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertCircle, Loader2, RotateCcw, Save } from "lucide-react";
 
 import { request } from "@/lib/api";
 import type { SystemSettings } from "@/lib/types";
@@ -47,51 +47,43 @@ export default function SettingsPage() {
     "local" | "s3" | undefined
   >(undefined);
   const [loading, setLoading] = useState(true);
+  // 是否完成首次加载（成功/失败均置 true，用于保存时检测 storageType 变更）
+  const [loaded, setLoaded] = useState(false);
+  // 加载失败时的错误信息（非 null 表示当前为错误态，不展示表单避免空值覆盖后端配置）
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // 防止首次加载完成后误判 storageType 变化
-  const loadedRef = useRef(false);
 
-  // 拉取系统设置
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await request<SystemSettings>({
-          method: "GET",
-          url: "/admin/settings",
-        });
-        if (cancelled) return;
-        const next: SystemSettings = {
-          ...data,
-          // 兜底默认值，避免 Select 无值时报错
-          storageType: data.storageType ?? "local",
-          allowRegister: data.allowRegister ?? false,
-          defaultQuality: data.defaultQuality ?? "standard",
-        };
-        setSettings(next);
-        setOriginalStorageType(next.storageType);
-        loadedRef.current = true;
-      } catch {
-        // 接口未实现时静默失败，保留空态可编辑
-        if (!cancelled) {
-          setSettings({
-            storageType: "local",
-            allowRegister: false,
-            defaultQuality: "standard",
-          });
-          setOriginalStorageType("local");
-          loadedRef.current = true;
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  // 拉取系统设置：失败时记录错误并展示重试入口，不再静默回退默认空值
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await request<SystemSettings>({
+        method: "GET",
+        url: "/admin/settings",
+      });
+      const next: SystemSettings = {
+        ...data,
+        // 兜底默认值，避免 Select 无值时报错
+        storageType: data.storageType ?? "local",
+        allowRegister: data.allowRegister ?? false,
+        defaultQuality: data.defaultQuality ?? "standard",
+      };
+      setSettings(next);
+      setOriginalStorageType(next.storageType);
+      setLoaded(true);
+    } catch (err) {
+      // 加载失败：记录错误信息，不回退默认空值，避免管理员误存覆盖后端真实配置
+      setLoadError(err instanceof Error ? err.message : "加载设置失败");
+      setLoaded(true);
+    } finally {
+      setLoading(false);
     }
-    void load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   // 通用字段更新函数
   function updateField<K extends keyof SystemSettings>(
@@ -112,7 +104,7 @@ export default function SettingsPage() {
       });
       // 检测存储类型是否变更 → 提示重启
       const storageChanged =
-        loadedRef.current &&
+        loaded &&
         originalStorageType !== undefined &&
         settings.storageType !== originalStorageType;
       // 更新原始存储类型记录
@@ -148,6 +140,27 @@ export default function SettingsPage() {
           <Skeleton className="h-9 w-72" />
           <Skeleton className="h-[420px] w-full" />
         </div>
+      ) : loadError ? (
+        // 加载失败：展示错误提示卡片 + 重试按钮，不展示空表单（避免被误存覆盖后端配置）
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              加载设置失败
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loadSettings()}
+            >
+              <RotateCcw className="h-4 w-4" />
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <Tabs defaultValue="basic" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-4">
@@ -421,7 +434,7 @@ export default function SettingsPage() {
             <Button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !!loadError}
               className="min-w-28"
             >
               {saving ? (

@@ -37,6 +37,16 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  /** 最近登录时间 */
+  lastLoginAt?: string | null;
+  /** 累计登录次数 */
+  loginCount?: number;
+  /** 关联统计：与后端 _count 结构对齐（收藏数 / 歌单数 / 播放历史数） */
+  _count?: {
+    favorites: number;
+    playlists: number;
+    playHistories: number;
+  };
 }
 
 /** 标签 */
@@ -90,6 +100,8 @@ export interface Playlist {
   userId: string;
   user?: { id: string; username: string; avatar?: string | null } | null;
   isPublic: boolean;
+  /** 系统歌单标记：官方运营歌单 */
+  isSystem?: boolean;
   playCount: number;
   songCount?: number;
   songs?: Song[];
@@ -103,6 +115,10 @@ export interface Banner {
   title: string;
   imageUrl: string;
   linkUrl?: string | null;
+  /** 关联歌曲 ID：点击优先播放（优先级最高） */
+  songId?: string | null;
+  /** 广告外链：点击打开新窗口（优先级中） */
+  adUrl?: string | null;
   sort: number;
   status: BannerStatus;
   createdAt: string;
@@ -163,4 +179,20 @@ export interface AppVersion {
   downloadCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 操作类型（与后端拦截器推断的 action 值对齐） */
+export type OperationAction = "CREATE" | "UPDATE" | "DELETE";
+
+/** 操作日志（与 Prisma OperationLog 模型对齐） */
+export interface OperationLog {
+  id: string;
+  userId?: string | null;
+  username?: string | null;
+  action: string;
+  resource?: string | null;
+  resourceId?: string | null;
+  detail?: string | null;
+  ip?: string | null;
+  createdAt: string;
 }

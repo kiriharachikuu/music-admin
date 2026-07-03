@@ -17,6 +17,8 @@ import {
   Sun,
   Moon,
   Smartphone,
+  TrendingUp,
+  ScrollText,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -55,6 +57,8 @@ const MENU: MenuItem[] = [
   { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
   { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
   { label: "用户管理", href: "/dashboard/users", icon: Users },
+  { label: "排行榜", href: "/dashboard/rankings", icon: TrendingUp },
+  { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
   { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
   { label: "系统设置", href: "/dashboard/settings", icon: Settings },
 ];

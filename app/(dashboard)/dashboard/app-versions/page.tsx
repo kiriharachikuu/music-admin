@@ -5,12 +5,8 @@
 // 新增/编辑 Dialog 表单 + 删除二次确认
 // 对接 CRUD /api/admin/app-versions
 import { useCallback, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   Download,
-  Loader2,
   Pencil,
   Plus,
   ShieldAlert,
@@ -26,67 +22,10 @@ import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// 版本表单校验
-const appVersionSchema = z.object({
-  versionCode: z.number().int("版本号需为整数").min(1, "版本号需 ≥ 1"),
-  versionName: z.string().min(1, "请输入版本名称"),
-  title: z.string().optional(),
-  content: z.string().optional(),
-  downloadUrl: z.string().min(1, "请输入下载地址"),
-  fileSize: z.number().int("文件大小需为整数").min(0, "文件大小需 ≥ 0"),
-  md5: z.string().optional(),
-  forceUpdate: z.boolean(),
-  minVersionCode: z.number().int("最低版本需为整数").min(0, "最低版本需 ≥ 0"),
-  channel: z.enum(["stable", "beta"]),
-  platform: z.enum(["android", "ios", "desktop"]),
-  status: z.enum(["draft", "published", "deprecated"]),
-});
-
-type AppVersionFormValues = z.infer<typeof appVersionSchema>;
-
-const CHANNEL_OPTIONS = [
-  { value: "stable", label: "正式版" },
-  { value: "beta", label: "测试版" },
-] as const;
-
-const PLATFORM_OPTIONS = [
-  { value: "android", label: "Android" },
-  { value: "ios", label: "iOS" },
-  { value: "desktop", label: "桌面端" },
-] as const;
-
-const STATUS_OPTIONS = [
-  { value: "draft", label: "草稿" },
-  { value: "published", label: "已发布" },
-  { value: "deprecated", label: "已废弃" },
-] as const;
+import { CHANNEL_OPTIONS, PLATFORM_OPTIONS, STATUS_OPTIONS } from "./schema";
+import { VersionFormDialog } from "./version-form-dialog";
 
 export default function AppVersionsPage() {
   const { toast } = useToast();
@@ -103,26 +42,7 @@ export default function AppVersionsPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AppVersion | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AppVersion | null>(null);
-
-  const form = useForm<AppVersionFormValues>({
-    resolver: zodResolver(appVersionSchema),
-    defaultValues: {
-      versionCode: 1,
-      versionName: "",
-      title: "",
-      content: "",
-      downloadUrl: "",
-      fileSize: 0,
-      md5: "",
-      forceUpdate: false,
-      minVersionCode: 0,
-      channel: "stable",
-      platform: "android",
-      status: "published",
-    },
-  });
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -137,8 +57,13 @@ export default function AppVersionsPage() {
           platform: filterPlatform || undefined,
         },
       });
-      setData(res.list ?? []);
+      const list = res.list ?? [];
+      setData(list);
       setTotal(res.total ?? 0);
+      // 删除当前页最后一项后可能停留在空页：若当前页为空且非首页，回退一页触发 effect 自动 refetch
+      if (list.length === 0 && page > 1) {
+        setPage(page - 1);
+      }
     } catch (err) {
       toast({
         title: "加载失败",
@@ -156,72 +81,13 @@ export default function AppVersionsPage() {
 
   function handleAdd() {
     setEditing(null);
-    form.reset({
-      versionCode: 1,
-      versionName: "",
-      title: "",
-      content: "",
-      downloadUrl: "",
-      fileSize: 0,
-      md5: "",
-      forceUpdate: false,
-      minVersionCode: 0,
-      channel: "stable",
-      platform: "android",
-      status: "published",
-    });
     setFormOpen(true);
   }
 
   function handleEdit(item: AppVersion) {
     setEditing(item);
     setSelectedRowKey(item.id);
-    form.reset({
-      versionCode: item.versionCode,
-      versionName: item.versionName,
-      title: item.title ?? "",
-      content: item.content ?? "",
-      downloadUrl: item.downloadUrl,
-      fileSize: item.fileSize,
-      md5: item.md5 ?? "",
-      forceUpdate: item.forceUpdate,
-      minVersionCode: item.minVersionCode,
-      channel: item.channel as "stable" | "beta",
-      platform: item.platform as "android" | "ios" | "desktop",
-      status: item.status as "draft" | "published" | "deprecated",
-    });
     setFormOpen(true);
-  }
-
-  async function handleSubmit(values: AppVersionFormValues) {
-    setSubmitting(true);
-    try {
-      if (editing) {
-        await request({
-          method: "PUT",
-          url: `/admin/app-versions/${editing.id}`,
-          data: values,
-        });
-        toast({ title: "保存成功" });
-      } else {
-        await request({
-          method: "POST",
-          url: "/admin/app-versions",
-          data: values,
-        });
-        toast({ title: "创建成功" });
-      }
-      setFormOpen(false);
-      void loadList();
-    } catch (err) {
-      toast({
-        title: editing ? "保存失败" : "创建失败",
-        description: err instanceof Error ? err.message : "请稍后重试",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function handleDelete(item: AppVersion) {
@@ -419,292 +285,15 @@ export default function AppVersionsPage() {
       />
 
       {/* 新增/编辑 Dialog */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "编辑版本" : "发布新版本"}</DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "修改应用版本信息，保存后立即生效"
-                : "发布新的应用版本，用户端将收到更新提示"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="versionCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>版本号 *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="versionName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>版本名称 *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如 1.2.0" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>更新标题</FormLabel>
-                    <FormControl>
-                      <Input placeholder="如 重磅更新来袭" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>更新内容</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="每行一条更新内容，或使用 JSON 数组格式"
-                        className="min-h-[120px]"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="platform"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>平台</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {PLATFORM_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="channel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>发布渠道</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {CHANNEL_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>状态</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="minVersionCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>最低兼容版本</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="downloadUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>下载地址 *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="https://.../app-release.apk"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="fileSize"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>文件大小 (字节)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="md5"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>MD5 校验</FormLabel>
-                      <FormControl>
-                        <Input placeholder="可选，用于文件完整性校验" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="forceUpdate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/60 p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel>强制更新</FormLabel>
-                      <p className="text-xs text-muted-foreground">
-                        开启后，低于此版本的用户必须更新才能继续使用
-                      </p>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setFormOpen(false)}
-                  disabled={submitting}
-                >
-                  取消
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-primary-700 text-white hover:bg-primary-600"
-                  disabled={submitting}
-                >
-                  {submitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {editing ? "保存" : "发布"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <VersionFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        editing={editing}
+        onSuccess={() => {
+          setFormOpen(false);
+          void loadList();
+        }}
+      />
 
       {/* 删除确认 */}
       <ConfirmDialog

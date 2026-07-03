@@ -1,7 +1,7 @@
 "use client";
 
 // XingTone - 用户管理
-// 列表（头像/用户名/邮箱/角色/注册时间/状态/操作）+ 搜索 + 分页
+// 列表（头像/用户名/角色/收藏/歌单/最近登录/注册时间/状态/操作）+ 搜索 + 分页
 // 禁用/启用：Switch 切换（基于软删除 deletedAt）
 // 设置管理员：按钮 + 二次确认（切换 role USER/ADMIN）
 // 对接 CRUD /api/admin/users，恢复 /api/admin/users/:id/restore
@@ -37,6 +37,9 @@ export default function UsersPage() {
 
   // 角色变更确认
   const [roleTarget, setRoleTarget] = useState<User | null>(null);
+
+  // 禁用/启用切换确认目标
+  const [toggleTarget, setToggleTarget] = useState<User | null>(null);
 
   const debouncedKeyword = useDebounced(keyword, 300);
 
@@ -87,6 +90,7 @@ export default function UsersPage() {
         data: { disabled },
       });
       toast({ title: disabled ? "已禁用" : "已启用" });
+      setToggleTarget(null);
       void loadList();
     } catch (err) {
       toast({
@@ -138,7 +142,6 @@ export default function UsersPage() {
       ),
     },
     { key: "username", title: "用户名", render: (row) => <span className="font-medium">{row.username}</span> },
-    { key: "email", title: "邮箱", render: (row) => <span className="text-muted-foreground">{row.email}</span> },
     {
       key: "role",
       title: "角色",
@@ -149,6 +152,32 @@ export default function UsersPage() {
         ) : (
           <Badge variant="secondary">普通用户</Badge>
         ),
+    },
+    {
+      key: "favoriteCount",
+      title: "收藏",
+      width: 80,
+      render: (row) => (
+        <span className="text-muted-foreground">{row._count?.favorites ?? 0}</span>
+      ),
+    },
+    {
+      key: "playlistCount",
+      title: "歌单",
+      width: 80,
+      render: (row) => (
+        <span className="text-muted-foreground">{row._count?.playlists ?? 0}</span>
+      ),
+    },
+    {
+      key: "lastLoginAt",
+      title: "最近登录",
+      width: 160,
+      render: (row) => (
+        <span className="text-muted-foreground">
+          {row.lastLoginAt ? formatDateTime(row.lastLoginAt) : "—"}
+        </span>
+      ),
     },
     {
       key: "createdAt",
@@ -164,10 +193,10 @@ export default function UsersPage() {
       width: 110,
       render: (row) => (
         <div className="flex items-center gap-2">
-          {/* 禁用/启用 Switch：开启态（正常）primary-700 */}
+          {/* 禁用/启用 Switch：开启态（正常）primary-700；切换前二次确认 */}
           <Switch
             checked={!row.deletedAt}
-            onCheckedChange={() => handleToggleDisabled(row)}
+            onCheckedChange={() => setToggleTarget(row)}
             disabled={togglingId === row.id}
           />
           {row.deletedAt ? (
@@ -254,6 +283,31 @@ export default function UsersPage() {
         confirmText={roleTarget?.role === "ADMIN" ? "取消管理员" : "设为管理员"}
         variant={roleTarget?.role === "ADMIN" ? "destructive" : "default"}
         onConfirm={handleRoleChange}
+      />
+
+      {/* 禁用/启用用户二次确认：避免误操作影响登录 */}
+      <ConfirmDialog
+        open={!!toggleTarget}
+        onOpenChange={(o) => {
+          if (!o) setToggleTarget(null);
+        }}
+        title={toggleTarget && !toggleTarget.deletedAt ? "禁用用户" : "启用用户"}
+        description={
+          toggleTarget
+            ? toggleTarget.deletedAt
+              ? `确定启用用户「${toggleTarget.username}」吗？启用后该用户可正常登录。`
+              : `确定禁用用户「${toggleTarget.username}」吗？禁用后该用户将无法登录。`
+            : ""
+        }
+        confirmText={
+          toggleTarget && !toggleTarget.deletedAt ? "禁用" : "启用"
+        }
+        variant={
+          toggleTarget && !toggleTarget.deletedAt ? "destructive" : "default"
+        }
+        onConfirm={() => {
+          if (toggleTarget) void handleToggleDisabled(toggleTarget);
+        }}
       />
     </div>
   );
