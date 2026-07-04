@@ -52,7 +52,7 @@ export default function BannersPage() {
       const res = await request<PageResult<Banner>>({
         method: "GET",
         url: "/admin/banners",
-        params: { page, pageSize },
+        params: { page, limit: pageSize },
       });
       setData(res.list ?? []);
       setTotal(res.total ?? 0);
