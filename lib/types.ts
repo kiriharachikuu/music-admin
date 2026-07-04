@@ -8,12 +8,13 @@ export interface PageQuery {
   keyword?: string;
 }
 
-/** 通用分页返回结构（后端 list + total + page + pageSize） */
+/** 通用分页返回结构（后端 list + total + page + limit） */
 export interface PageResult<T> {
   list: T[];
   total: number;
   page: number;
-  pageSize: number;
+  limit: number;
+  totalPages?: number;
 }
 
 /** 文件上传返回结构 */

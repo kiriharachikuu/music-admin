@@ -44,13 +44,13 @@ api.interceptors.response.use(
       // 后端 code 为 HTTP 状态码，2xx 视为成功，直接返回 data
       if (result.code >= 200 && result.code < 300) {
         // 拦截器解包后，调用方拿到的即为业务数据 data
-        return result.data as unknown as typeof response;
+        return result.data;
       }
       // 业务错误：抛出 message
       return Promise.reject(new Error(result.message || "请求失败"));
     }
     // 非标准格式（如文件流）直接返回原始数据
-    return response.data as unknown as typeof response;
+    return response.data;
   },
   (error: AxiosError<{ message?: string; code?: number }>) => {
     const status = error.response?.status;
@@ -72,9 +72,9 @@ api.interceptors.response.use(
  * 通用请求方法，泛型 T 为业务数据 data 的类型
  * 用法：const data = await request<User>('/user/info', { method: 'GET' })
  */
-export function request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
-  // 第一个泛型保留为 unknown，第二个泛型 T 为实际返回类型（与拦截器解包一致）
-  return api.request<unknown, T>(config);
+export async function request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+  const response = await api.request(config);
+  return response as unknown as T;
 }
 
 export default api;
