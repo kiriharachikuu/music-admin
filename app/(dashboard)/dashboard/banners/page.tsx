@@ -49,13 +49,18 @@ export default function BannersPage() {
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await request<PageResult<Banner>>({
+      const res = await request<PageResult<Banner> | Banner[]>({
         method: "GET",
         url: "/admin/banners",
         params: { page, limit: pageSize },
       });
-      setData(res.list ?? []);
-      setTotal(res.total ?? 0);
+      if (Array.isArray(res)) {
+        setData(res);
+        setTotal(res.length);
+      } else {
+        setData(res.list ?? []);
+        setTotal(res.total ?? 0);
+      }
     } catch (err) {
       toast({
         title: "加载失败",
