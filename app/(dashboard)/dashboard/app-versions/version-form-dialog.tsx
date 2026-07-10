@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, File, X } from "lucide-react";
 
 import { request } from "@/lib/api";
 import type { AppVersion } from "@/lib/types";
@@ -41,11 +41,22 @@ export function VersionFormDialog({
 }: VersionFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AppVersionFormValues>({
     resolver: zodResolver(appVersionSchema),
     defaultValues: appVersionFormDefaultValues,
   });
+
+  useEffect(() => {
+    if (!open) {
+      setUploadedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,11 +91,27 @@ export function VersionFormDialog({
         });
         toast({ title: "保存成功" });
       } else {
-        await request({
-          method: "POST",
-          url: "/admin/app-versions",
-          data: values,
-        });
+        if (uploadedFile) {
+          const formData = new FormData();
+          Object.keys(values).forEach((key) => {
+            const val = values[key as keyof AppVersionFormValues];
+            if (val !== undefined && val !== null) {
+              formData.append(key, String(val));
+            }
+          });
+          formData.append("file", uploadedFile);
+          await request({
+            method: "POST",
+            url: "/admin/app-versions",
+            data: formData,
+          });
+        } else {
+          await request({
+            method: "POST",
+            url: "/admin/app-versions",
+            data: values,
+          });
+        }
         toast({ title: "创建成功" });
       }
       onSuccess();
@@ -289,22 +316,83 @@ export function VersionFormDialog({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="downloadUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>下载地址 *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="https://.../app-release.apk"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <div className="space-y-2">
+              <FormLabel>APK 文件上传</FormLabel>
+              <div className="relative">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".apk"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && file.name.endsWith('.apk')) {
+                      setUploadedFile(file);
+                    } else if (file) {
+                      toast({
+                        title: '文件格式错误',
+                        description: '请上传 APK 格式的文件',
+                        variant: 'destructive',
+                      });
+                      e.target.value = '';
+                    }
+                  }}
+                  className="hidden"
+                  disabled={!!editing}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-center gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!!editing || !!uploadedFile}
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploadedFile ? '已选择文件' : '选择 APK 文件'}
+                </Button>
+                {uploadedFile && (
+                  <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+                    <File className="h-8 w-8 text-primary" />
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">{uploadedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setUploadedFile(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = '';
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {!editing && !uploadedFile && (
+                <FormField
+                  control={form.control}
+                  name="downloadUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">或手动填写下载地址</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://.../app-release.apk"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
-            />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

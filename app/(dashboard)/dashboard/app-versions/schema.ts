@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-// 版本表单校验
 export const appVersionSchema = z.object({
   versionCode: z.number().int("版本号需为整数").min(1, "版本号需 ≥ 1"),
   versionName: z.string().min(1, "请输入版本名称"),
   title: z.string().optional(),
   content: z.string().optional(),
-  downloadUrl: z.string().min(1, "请输入下载地址"),
+  downloadUrl: z.string().optional(),
   fileSize: z.number().int("文件大小需为整数").min(0, "文件大小需 ≥ 0"),
   md5: z.string().optional(),
   forceUpdate: z.boolean(),
