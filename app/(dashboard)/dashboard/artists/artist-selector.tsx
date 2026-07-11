@@ -92,7 +92,12 @@ export function ArtistSelector({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">歌手</span>
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(true)}
+          >
             选择歌手
           </Button>
         </div>
@@ -218,6 +223,7 @@ export function ArtistSelector({
             {!loading && list.length < total && (
               <div className="flex justify-center py-4">
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={handleLoadMore}
