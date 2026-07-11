@@ -56,6 +56,17 @@ export interface Tag {
   name: string;
 }
 
+/** 歌手 */
+export interface Artist {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  bio?: string | null;
+  representativeWorks?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** 歌曲（含关联字段，用于编辑回显） */
 export interface Song {
   id: string;
@@ -75,6 +86,9 @@ export interface Song {
   /** 后端返回的关联表结构，前端映射为 tags */
   songTags?: { tag: Tag }[];
   tags?: Tag[];
+  /** 后端返回的关联表结构，前端映射为 artists */
+  songArtists?: { artist: Artist }[];
+  artists?: Artist[];
   createdAt: string;
   updatedAt: string;
 }
@@ -88,6 +102,9 @@ export interface Album {
   description?: string | null;
   releaseDate: string;
   songCount: number;
+  /** 后端返回的关联表结构，前端映射为 artists */
+  albumArtists?: { artist: Artist }[];
+  artists?: Artist[];
   createdAt: string;
   updatedAt: string;
 }

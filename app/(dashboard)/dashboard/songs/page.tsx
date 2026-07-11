@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, UploadCloud } from "lucide-react";
 
 import { request } from "@/lib/api";
-import type { Album, PageResult, Song, Tag } from "@/lib/types";
+import type { Album, Artist, PageResult, Song, Tag } from "@/lib/types";
 import { useDebounced } from "@/lib/admin-utils";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
@@ -44,6 +44,7 @@ export default function SongsPage() {
   // 关联数据
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
 
   // 弹窗状态
   const [formOpen, setFormOpen] = useState(false);
@@ -90,16 +91,22 @@ export default function SongsPage() {
   // 加载专辑与标签（下拉/多选用）
   const loadOptions = useCallback(async () => {
     try {
-      const [albumRes, tagRes] = await Promise.all([
+      const [albumRes, tagRes, artistRes] = await Promise.all([
         request<PageResult<Album>>({
           method: "GET",
           url: "/admin/albums",
           params: { page: 1, pageSize: 200 },
         }),
         request<Tag[]>({ method: "GET", url: "/admin/tags" }),
+        request<PageResult<Artist>>({
+          method: "GET",
+          url: "/admin/artists",
+          params: { page: 1, pageSize: 200 },
+        }),
       ]);
       setAlbums(albumRes.list ?? []);
       setTags(tagRes ?? []);
+      setArtists(artistRes.list ?? []);
     } catch {
       // 选项加载失败不阻塞主流程
     }
@@ -238,6 +245,7 @@ export default function SongsPage() {
         editing={editing}
         albums={albums}
         tags={tags}
+        artists={artists}
         onSuccess={() => {
           setFormOpen(false);
           setEditing(null);

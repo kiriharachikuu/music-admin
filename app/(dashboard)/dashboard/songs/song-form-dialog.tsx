@@ -53,6 +53,8 @@ import {
   TagSelector,
 } from "./song-form-fields";
 import { LyricEditorDialog } from "./lyric-editor-dialog";
+import { ArtistSelector } from "../artists/artist-selector";
+import type { Artist } from "@/lib/types";
 
 // ==================== 歌曲新增/编辑表单弹窗 ====================
 export interface SongFormDialogProps {
@@ -61,6 +63,7 @@ export interface SongFormDialogProps {
   editing: Song | null;
   albums: Album[];
   tags: Tag[];
+  artists: Artist[];
   onSuccess: () => void;
 }
 
@@ -70,12 +73,13 @@ export function SongFormDialog({
   editing,
   albums,
   tags,
+  artists,
   onSuccess,
 }: SongFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
-  // 选中的标签 id 数组
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
   // 音频元信息解析状态
   const [parsing, setParsing] = useState(false);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
@@ -110,9 +114,11 @@ export function SongFormDialog({
         status: editing.status,
       });
       setSelectedTagIds(editing.tags?.map((t) => t.id) ?? []);
+      setSelectedArtistIds(editing.songArtists?.map((sa) => sa.artist.id) ?? []);
     } else {
       form.reset(getDefaultSongFormValues());
       setSelectedTagIds([]);
+      setSelectedArtistIds([]);
     }
   }, [open, editing, form]);
 
@@ -175,11 +181,11 @@ export function SongFormDialog({
   async function onSubmit(values: SongFormValues) {
     setSubmitting(true);
     try {
-      // 哨兵值转 null，并组装 tagIds
       const payload = {
         ...values,
         albumId: values.albumId === NO_ALBUM ? null : values.albumId,
         tagIds: selectedTagIds,
+        artistIds: selectedArtistIds,
       };
       if (editing) {
         await request({
@@ -416,6 +422,13 @@ export function SongFormDialog({
                 tags={tags}
                 selectedTagIds={selectedTagIds}
                 onToggle={toggleTag}
+              />
+
+              {/* 歌手多选 */}
+              <ArtistSelector
+                selectedIds={selectedArtistIds}
+                onSelectedChange={setSelectedArtistIds}
+                artists={artists}
               />
 
               <DialogFooter>

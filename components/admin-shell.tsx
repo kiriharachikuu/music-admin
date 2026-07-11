@@ -19,6 +19,7 @@ import {
   Smartphone,
   TrendingUp,
   ScrollText,
+  Mic,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ interface MenuItem {
 const MENU: MenuItem[] = [
   { label: "数据看板", href: "/dashboard", icon: LayoutDashboard, exact: true },
   { label: "歌曲管理", href: "/dashboard/songs", icon: Music },
+  { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
   { label: "专辑管理", href: "/dashboard/albums", icon: Disc3 },
   { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
   { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },

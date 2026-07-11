@@ -12,7 +12,8 @@ import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
-import type { Album, PageResult } from "@/lib/types";
+import type { Album, Artist, PageResult } from "@/lib/types";
+import { ArtistSelector } from "../artists/artist-selector";
 import { formatDate, useDebounced } from "@/lib/admin-utils";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
@@ -62,6 +63,7 @@ export default function AlbumsPage() {
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [artists, setArtists] = useState<Artist[]>([]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Album | null>(null);
@@ -97,6 +99,21 @@ export default function AlbumsPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedKeyword]);
+
+  useEffect(() => {
+    async function loadArtists() {
+      try {
+        const res = await request<PageResult<Artist>>({
+          method: "GET",
+          url: "/admin/artists",
+          params: { page: 1, pageSize: 200 },
+        });
+        setArtists(res.list ?? []);
+      } catch {
+      }
+    }
+    void loadArtists();
+  }, []);
 
   function handleAdd() {
     setEditing(null);
@@ -224,6 +241,7 @@ export default function AlbumsPage() {
           }
         }}
         editing={editing}
+        artists={artists}
         onSuccess={() => {
           setFormOpen(false);
           setEditing(null);
@@ -254,6 +272,7 @@ interface AlbumFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: Album | null;
+  artists: Artist[];
   onSuccess: () => void;
 }
 
@@ -261,10 +280,12 @@ function AlbumFormDialog({
   open,
   onOpenChange,
   editing,
+  artists,
   onSuccess,
 }: AlbumFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
 
   const form = useForm<AlbumFormValues>({
     resolver: zodResolver(albumSchema),
@@ -287,6 +308,7 @@ function AlbumFormDialog({
         description: editing.description || "",
         releaseDate: editing.releaseDate?.slice(0, 10) || "",
       });
+      setSelectedArtistIds(editing.albumArtists?.map((aa) => aa.artist.id) ?? []);
     } else {
       form.reset({
         name: "",
@@ -295,21 +317,23 @@ function AlbumFormDialog({
         description: "",
         releaseDate: new Date().toISOString().slice(0, 10),
       });
+      setSelectedArtistIds([]);
     }
   }, [open, editing, form]);
 
   async function onSubmit(values: AlbumFormValues) {
     setSubmitting(true);
     try {
+      const payload = { ...values, artistIds: selectedArtistIds };
       if (editing) {
         await request({
           method: "PUT",
           url: `/admin/albums/${editing.id}`,
-          data: values,
+          data: payload,
         });
         toast({ title: "保存成功" });
       } else {
-        await request({ method: "POST", url: "/admin/albums", data: values });
+        await request({ method: "POST", url: "/admin/albums", data: payload });
         toast({ title: "新增成功" });
       }
       onSuccess();
@@ -416,6 +440,12 @@ function AlbumFormDialog({
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            <ArtistSelector
+              selectedIds={selectedArtistIds}
+              onSelectedChange={setSelectedArtistIds}
+              artists={artists}
             />
 
             <DialogFooter>
