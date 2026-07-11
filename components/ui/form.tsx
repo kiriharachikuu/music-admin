@@ -30,12 +30,18 @@ const FormField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 >({
+  render,
   ...props
 }: ControllerProps<TFieldValues, TName>) => {
   return (
-    <FormFieldContext.Provider value={{ name: props.name }}>
-      <Controller {...props} />
-    </FormFieldContext.Provider>
+    <Controller
+      {...props}
+      render={(controllerProps) => (
+        <FormFieldContext.Provider value={{ name: props.name }}>
+          {render(controllerProps)}
+        </FormFieldContext.Provider>
+      )}
+    />
   )
 }
 
