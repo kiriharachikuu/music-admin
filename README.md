@@ -1,6 +1,10 @@
 # XingTone Admin
 
+> 当前版本：0.3.1
+
 XingTone 音乐播放器管理后台，用于管理歌曲、专辑、歌手、用户、Banner 及系统配置。
+
+完整文档请参考 [docs 目录](../docs/README.md)。
 
 ## 技术栈
 
