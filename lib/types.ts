@@ -65,6 +65,7 @@ export interface Artist {
   representativeWorks?: string | null;
   createdAt: string;
   updatedAt: string;
+  songArtists?: { artist?: Artist; song?: { id: string; title: string } }[];
 }
 
 /** 歌曲（含关联字段，用于编辑回显） */

@@ -45,7 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 // （zod 4 + react-hook-form 对 .optional().default() 的输入/输出类型推断存在不兼容）
 const albumSchema = z.object({
   name: z.string().min(1, "请输入专辑名称"),
-  artist: z.string().min(1, "请输入艺术家"),
+  artist: z.string().optional(),
   cover: z.string(),
   description: z.string(),
   releaseDate: z.string().min(1, "请选择发行日期"),
@@ -359,34 +359,19 @@ function AlbumFormDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>专辑名称</FormLabel>
-                    <FormControl>
-                      <Input placeholder="请输入专辑名称" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="artist"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>艺术家</FormLabel>
-                    <FormControl>
-                      <Input placeholder="请输入艺术家" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>专辑名称</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入专辑名称" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

@@ -8,7 +8,7 @@ export const NO_ALBUM = "__none__";
 // （zod 4 + react-hook-form 对 .optional().default() 的输入/输出类型推断存在不兼容）
 export const songSchema = z.object({
   title: z.string().min(1, "请输入歌曲标题"),
-  artist: z.string().min(1, "请输入歌手"),
+  artist: z.string().optional(),
   albumId: z.string(),
   duration: z.number().int("时长需为整数").min(1, "时长需大于 0"),
   fileUrl: z.string().min(1, "请上传音频文件"),

@@ -34,6 +34,7 @@ import {
   getDefaultArtistFormValues,
   type ArtistFormValues,
 } from "./schema";
+import { SongSelector } from "./song-selector";
 
 export interface ArtistFormDialogProps {
   open: boolean;
@@ -50,6 +51,8 @@ export function ArtistFormDialog({
 }: ArtistFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
 
   const form = useForm<ArtistFormValues>({
     resolver: zodResolver(artistSchema),
@@ -58,13 +61,37 @@ export function ArtistFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    setSelectedSongIds([]);
     if (editing) {
-      form.reset({
-        name: editing.name,
-        avatar: editing.avatar || "",
-        bio: editing.bio || "",
-        representativeWorks: editing.representativeWorks || "",
-      });
+      setLoadingDetail(true);
+      request<Artist>({
+        method: "GET",
+        url: `/admin/artists/${editing.id}`,
+      })
+        .then((detail) => {
+          form.reset({
+            name: detail.name,
+            avatar: detail.avatar || "",
+            bio: detail.bio || "",
+            representativeWorks: detail.representativeWorks || "",
+          });
+          if (detail.songArtists) {
+            setSelectedSongIds(
+              detail.songArtists
+                .filter((sa) => sa.song?.id)
+                .map((sa) => sa.song!.id),
+            );
+          }
+        })
+        .catch(() => {
+          form.reset({
+            name: editing.name,
+            avatar: editing.avatar || "",
+            bio: editing.bio || "",
+            representativeWorks: editing.representativeWorks || "",
+          });
+        })
+        .finally(() => setLoadingDetail(false));
     } else {
       form.reset(getDefaultArtistFormValues());
     }
@@ -73,15 +100,16 @@ export function ArtistFormDialog({
   async function onSubmit(values: ArtistFormValues) {
     setSubmitting(true);
     try {
+      const payload = { ...values, songIds: selectedSongIds };
       if (editing) {
         await request({
           method: "PUT",
           url: `/admin/artists/${editing.id}`,
-          data: values,
+          data: payload,
         });
         toast({ title: "保存成功" });
       } else {
-        await request({ method: "POST", url: "/admin/artists", data: values });
+        await request({ method: "POST", url: "/admin/artists", data: payload });
         toast({ title: "新增成功" });
       }
       onSuccess();
@@ -105,8 +133,13 @@ export function ArtistFormDialog({
             {editing ? "修改歌手信息并保存" : "填写歌手信息"}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {loadingDetail ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -177,6 +210,11 @@ export function ArtistFormDialog({
               )}
             />
 
+            <SongSelector
+              selectedIds={selectedSongIds}
+              onSelectedChange={setSelectedSongIds}
+            />
+
             <DialogFooter>
               <Button
                 type="button"
@@ -197,6 +235,7 @@ export function ArtistFormDialog({
             </DialogFooter>
           </form>
         </Form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -62,18 +62,18 @@ export function VersionFormDialog({
     if (!open) return;
     if (editing) {
       form.reset({
-        versionCode: editing.versionCode,
-        versionName: editing.versionName,
+        versionCode: editing.versionCode ?? 1,
+        versionName: editing.versionName ?? "",
         title: editing.title ?? "",
         content: editing.content ?? "",
-        downloadUrl: editing.downloadUrl,
-        fileSize: editing.fileSize,
+        downloadUrl: editing.downloadUrl ?? "",
+        fileSize: editing.fileSize ?? 0,
         md5: editing.md5 ?? "",
-        forceUpdate: editing.forceUpdate,
-        minVersionCode: editing.minVersionCode,
-        channel: editing.channel as "stable" | "beta",
-        platform: editing.platform as "android" | "ios" | "desktop",
-        status: editing.status as "draft" | "published" | "deprecated",
+        forceUpdate: editing.forceUpdate ?? false,
+        minVersionCode: editing.minVersionCode ?? 0,
+        channel: (editing.channel as "stable" | "beta") ?? "stable",
+        platform: (editing.platform as "android" | "ios" | "desktop") ?? "android",
+        status: (editing.status as "draft" | "published" | "deprecated") ?? "draft",
       });
     } else {
       form.reset(appVersionFormDefaultValues);
@@ -185,7 +185,7 @@ export function VersionFormDialog({
                 <FormItem>
                   <FormLabel>更新标题</FormLabel>
                   <FormControl>
-                    <Input placeholder="如 重磅更新来袭" {...field} />
+                    <Input placeholder="如 重磅更新来袭" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,6 +203,7 @@ export function VersionFormDialog({
                       placeholder="每行一条更新内容，或使用 JSON 数组格式"
                       className="min-h-[120px]"
                       {...field}
+                      value={field.value ?? ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -385,6 +386,7 @@ export function VersionFormDialog({
                         <Input
                           placeholder="https://.../app-release.apk"
                           {...field}
+                          value={field.value ?? ""}
                         />
                       </FormControl>
                       <FormMessage />
@@ -421,7 +423,7 @@ export function VersionFormDialog({
                   <FormItem>
                     <FormLabel>MD5 校验</FormLabel>
                     <FormControl>
-                      <Input placeholder="可选，用于文件完整性校验" {...field} />
+                      <Input placeholder="可选，用于文件完整性校验" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
