@@ -104,23 +104,8 @@ export default function SettingsPage() {
         url: "/admin/settings",
         data: settings,
       });
-      // 检测存储类型是否变更 → 提示重启
-      const storageChanged =
-        loaded &&
-        originalStorageType !== undefined &&
-        settings.storageType !== originalStorageType;
-      // 更新原始存储类型记录
       setOriginalStorageType(settings.storageType);
-      toast({ title: "保存成功" });
-      if (storageChanged) {
-        // 延迟弹出，避免与成功 toast 互相覆盖（useToast 限制 1 条）
-        setTimeout(() => {
-          toast({
-            title: "存储方式已切换",
-            description: "需重启后端服务后生效",
-          });
-        }, 1200);
-      }
+      toast({ title: "保存成功", description: "配置已即时生效" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "保存失败";
       toast({ title: "保存失败", description: message, variant: "destructive" });
@@ -335,7 +320,7 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    切换存储方式后需重启后端服务，已上传文件不会自动迁移。
+                    保存后立即生效，已上传文件不会自动迁移，可使用下方一键迁移功能。
                   </p>
                 </div>
 
