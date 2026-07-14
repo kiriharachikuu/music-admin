@@ -167,13 +167,14 @@ export interface SystemSettings {
   copyright?: string;
   seoKeywords?: string;
   seoDescription?: string;
-  storageType?: "local" | "s3";
-  s3Endpoint?: string;
-  s3Bucket?: string;
-  s3AccessKey?: string;
-  s3SecretKey?: string;
-  s3Region?: string;
-  s3PublicDomain?: string;
+  storageType?: "local" | "s3" | "cos";
+  bucket?: string;
+  region?: string;
+  secretId?: string;
+  secretKey?: string;
+  sessionToken?: string;
+  endpoint?: string;
+  publicDomain?: string;
   allowRegister?: boolean;
   defaultQuality?: "standard" | "high" | "lossless";
   [key: string]: unknown;
@@ -213,4 +214,20 @@ export interface OperationLog {
   detail?: string | null;
   ip?: string | null;
   createdAt: string;
+}
+
+/** 存储迁移进度 */
+export type MigrationStatus = "idle" | "running" | "completed" | "failed";
+export interface MigrationProgress {
+  status: MigrationStatus;
+  total: number;
+  processed: number;
+  migrated: number;
+  failed: number;
+  skipped: number;
+  dbUpdated: number;
+  logs: string[];
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
 }

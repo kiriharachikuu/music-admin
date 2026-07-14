@@ -8,11 +8,11 @@
 // - 其他：注册开关、默认音质（standard/high/lossless）
 // 对接 GET /api/admin/settings、PUT /api/admin/settings
 // 字段异构且多为可选，采用受控 useState（不引入 react-hook-form）
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Loader2, RotateCcw, Save } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertCircle, Loader2, RotateCcw, Save, UploadCloud, XCircle } from "lucide-react";
 
 import { request } from "@/lib/api";
-import type { SystemSettings } from "@/lib/types";
+import type { MigrationProgress, SystemSettings } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
 import { FileUpload } from "@/components/admin/file-upload";
@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>({});
   // 记录加载完成时的原始存储类型，用于保存时检测是否变更
   const [originalStorageType, setOriginalStorageType] = useState<
-    "local" | "s3" | undefined
+    "local" | "s3" | "cos" | undefined
   >(undefined);
   const [loading, setLoading] = useState(true);
   // 是否完成首次加载（成功/失败均置 true，用于保存时检测 storageType 变更）
@@ -52,6 +52,8 @@ export default function SettingsPage() {
   // 加载失败时的错误信息（非 null 表示当前为错误态，不展示表单避免空值覆盖后端配置）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [migration, setMigration] = useState<MigrationProgress | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   // 拉取系统设置：失败时记录错误并展示重试入口，不再静默回退默认空值
   const loadSettings = useCallback(async () => {
@@ -126,6 +128,50 @@ export default function SettingsPage() {
       setSaving(false);
     }
   }
+
+  const fetchMigrationStatus = useCallback(async () => {
+    try {
+      const data = await request<MigrationProgress>({ url: "/admin/migration/status", method: "GET" });
+      setMigration(data);
+      if (data.status !== "running" && pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    } catch {}
+  }, []);
+
+  const startMigration = useCallback(async () => {
+    try {
+      const ok = await confirm("确定开始将本地存储的文件迁移到对象存储吗？此过程可能需要较长时间，请保持页面打开。");
+      if (!ok) return;
+      const data = await request<MigrationProgress>({ url: "/admin/migration/start", method: "POST" });
+      setMigration(data);
+      toast({ title: "迁移已启动", description: "文件迁移进行中..." });
+      if (!pollRef.current) {
+        pollRef.current = setInterval(() => void fetchMigrationStatus(), 2000);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "启动失败";
+      toast({ title: "启动失败", description: message, variant: "destructive" });
+    }
+  }, [fetchMigrationStatus, toast]);
+
+  const cancelMigration = useCallback(async () => {
+    try {
+      await request({ url: "/admin/migration/cancel", method: "POST" });
+      toast({ title: "已请求取消", description: "将在当前文件处理完成后停止" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "取消失败";
+      toast({ title: "取消失败", description: message, variant: "destructive" });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    void fetchMigrationStatus();
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [fetchMigrationStatus]);
 
   return (
     <div className="space-y-6">
@@ -276,7 +322,7 @@ export default function SettingsPage() {
                   <Select
                     value={settings.storageType ?? "local"}
                     onValueChange={(v) =>
-                      updateField("storageType", v as "local" | "s3")
+                      updateField("storageType", v as "local" | "s3" | "cos")
                     }
                   >
                     <SelectTrigger className="w-full sm:w-72">
@@ -284,7 +330,8 @@ export default function SettingsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="local">本地存储</SelectItem>
-                      <SelectItem value="s3">对象存储（S3）</SelectItem>
+                      <SelectItem value="s3">对象存储（S3 兼容）</SelectItem>
+                      <SelectItem value="cos">腾讯云 COS</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -292,86 +339,179 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                {/* S3 配置项：仅当存储方式为 s3 时展示 */}
-                {settings.storageType === "s3" && (
+                {/* 对象存储配置项：仅当存储方式为 s3 或 cos 时展示 */}
+                {(settings.storageType === "s3" || settings.storageType === "cos") && (
                   <div className="space-y-5 rounded-lg border border-border/60 bg-muted/30 p-4">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {/* Endpoint */}
-                      <div className="space-y-2">
-                        <Label htmlFor="s3Endpoint">Endpoint</Label>
-                        <Input
-                          id="s3Endpoint"
-                          value={(settings.s3Endpoint as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3Endpoint", e.target.value)
-                          }
-                          placeholder="https://s3.example.com"
-                        />
-                      </div>
                       {/* Bucket */}
                       <div className="space-y-2">
-                        <Label htmlFor="s3Bucket">Bucket</Label>
+                        <Label htmlFor="bucket">Bucket</Label>
                         <Input
-                          id="s3Bucket"
-                          value={(settings.s3Bucket as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3Bucket", e.target.value)
-                          }
-                          placeholder="xingtong-music"
+                          id="bucket"
+                          value={(settings.bucket as string) ?? ""}
+                          onChange={(e) => updateField("bucket", e.target.value)}
+                          placeholder="chikuu-1252656027"
                         />
                       </div>
                       {/* Region */}
                       <div className="space-y-2">
-                        <Label htmlFor="s3Region">Region</Label>
+                        <Label htmlFor="region">Region</Label>
                         <Input
-                          id="s3Region"
-                          value={(settings.s3Region as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3Region", e.target.value)
-                          }
-                          placeholder="us-east-1"
+                          id="region"
+                          value={(settings.region as string) ?? ""}
+                          onChange={(e) => updateField("region", e.target.value)}
+                          placeholder="ap-nanjing"
                         />
                       </div>
-                      {/* 公开域名 */}
+                      {/* SecretId */}
                       <div className="space-y-2">
-                        <Label htmlFor="s3PublicDomain">公开访问域名</Label>
+                        <Label htmlFor="secretId">SecretId</Label>
                         <Input
-                          id="s3PublicDomain"
-                          value={(settings.s3PublicDomain as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3PublicDomain", e.target.value)
-                          }
-                          placeholder="https://cdn.example.com"
-                        />
-                      </div>
-                      {/* AccessKey */}
-                      <div className="space-y-2">
-                        <Label htmlFor="s3AccessKey">AccessKey</Label>
-                        <Input
-                          id="s3AccessKey"
-                          value={(settings.s3AccessKey as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3AccessKey", e.target.value)
-                          }
-                          placeholder="AccessKey"
+                          id="secretId"
+                          value={(settings.secretId as string) ?? ""}
+                          onChange={(e) => updateField("secretId", e.target.value)}
+                          placeholder="AKID..."
                           autoComplete="off"
                         />
                       </div>
                       {/* SecretKey */}
                       <div className="space-y-2">
-                        <Label htmlFor="s3SecretKey">SecretKey</Label>
+                        <Label htmlFor="secretKey">SecretKey</Label>
                         <Input
-                          id="s3SecretKey"
+                          id="secretKey"
                           type="password"
-                          value={(settings.s3SecretKey as string) ?? ""}
-                          onChange={(e) =>
-                            updateField("s3SecretKey", e.target.value)
-                          }
+                          value={(settings.secretKey as string) ?? ""}
+                          onChange={(e) => updateField("secretKey", e.target.value)}
                           placeholder="SecretKey"
                           autoComplete="new-password"
                         />
                       </div>
+                      {/* SessionToken（可选） */}
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="sessionToken">SessionToken（可选）</Label>
+                        <Input
+                          id="sessionToken"
+                          value={(settings.sessionToken as string) ?? ""}
+                          onChange={(e) => updateField("sessionToken", e.target.value)}
+                          placeholder="临时密钥 SessionToken，非必须"
+                          autoComplete="off"
+                        />
+                      </div>
                     </div>
+
+                    {/* S3 兼容可选扩展配置 */}
+                    {settings.storageType === "s3" && (
+                      <div className="space-y-4 border-t border-border/50 pt-4">
+                        <p className="text-xs text-muted-foreground">
+                          S3 兼容服务扩展配置（MinIO / R2 等需要，COS 无需填写）
+                        </p>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="endpoint">Endpoint（可选）</Label>
+                            <Input
+                              id="endpoint"
+                              value={(settings.endpoint as string) ?? ""}
+                              onChange={(e) => updateField("endpoint", e.target.value)}
+                              placeholder="https://s3.example.com"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="publicDomain">公开域名（可选）</Label>
+                            <Input
+                              id="publicDomain"
+                              value={(settings.publicDomain as string) ?? ""}
+                              onChange={(e) => updateField("publicDomain", e.target.value)}
+                              placeholder="https://cdn.example.com"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 一键迁移 */}
+                {settings.storageType !== "local" && (
+                  <div className="space-y-4 rounded-lg border border-border/60 bg-muted/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium">一键迁移</h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          将本地 uploads 目录下的文件迁移到对象存储，并自动更新数据库中的文件引用
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => void startMigration()}
+                          disabled={migration?.status === "running"}
+                        >
+                          {migration?.status === "running" ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <UploadCloud className="h-4 w-4 mr-2" />
+                          )}
+                          {migration?.status === "running" ? "迁移中..." : "开始迁移"}
+                        </Button>
+                        {migration?.status === "running" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void cancelMigration()}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            取消
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {migration && migration.total > 0 && (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>进度</span>
+                            <span>{migration.processed} / {migration.total}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{
+                                width: `${migration.total > 0 ? (migration.processed / migration.total) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            <span>成功: {migration.migrated}</span>
+                            <span>失败: {migration.failed}</span>
+                            <span>跳过: {migration.skipped}</span>
+                            <span>DB更新: {migration.dbUpdated}</span>
+                          </div>
+                        </div>
+
+                        {migration.logs.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">迁移日志</p>
+                            <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background p-3 text-xs font-mono">
+                              {migration.logs.map((line, i) => (
+                                <div key={i} className="text-muted-foreground">{line}</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {migration.status === "completed" && (
+                          <div className="rounded-md bg-green-500/10 p-3 text-xs text-green-600">
+                            迁移完成！共处理 {migration.processed} 个文件，成功 {migration.migrated} 个，失败 {migration.failed} 个
+                          </div>
+                        )}
+                        {migration.status === "failed" && (
+                          <div className="rounded-md bg-red-500/10 p-3 text-xs text-red-600">
+                            迁移失败：{migration.error || "未知错误"}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
