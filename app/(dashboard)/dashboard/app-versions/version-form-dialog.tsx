@@ -318,7 +318,9 @@ export function VersionFormDialog({
             </div>
 
             <div className="space-y-2">
-              <FormLabel>APK 文件上传</FormLabel>
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                APK 文件上传
+              </label>
               <div className="relative">
                 <input
                   ref={fileInputRef}
