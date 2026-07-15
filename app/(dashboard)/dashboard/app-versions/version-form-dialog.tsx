@@ -95,8 +95,8 @@ export function VersionFormDialog({
           const formData = new FormData();
           Object.keys(values).forEach((key) => {
             const val = values[key as keyof AppVersionFormValues];
-            if (val !== undefined && val !== null) {
-              formData.append(key, String(val));
+            if (val !== undefined && val !== null && val !== "") {
+              formData.append(key, typeof val === "boolean" ? (val ? "true" : "false") : String(val));
             }
           });
           formData.append("file", uploadedFile);
