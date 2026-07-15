@@ -330,6 +330,7 @@ export function VersionFormDialog({
                     const file = e.target.files?.[0];
                     if (file && file.name.endsWith('.apk')) {
                       setUploadedFile(file);
+                      form.setValue("fileSize", file.size);
                     } else if (file) {
                       toast({
                         title: '文件格式错误',
@@ -377,25 +378,25 @@ export function VersionFormDialog({
                   </div>
                 )}
               </div>
-              {!editing && !uploadedFile && (
-                <FormField
-                  control={form.control}
-                  name="downloadUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-muted-foreground">或手动填写下载地址</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="https://.../app-release.apk"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+              <FormField
+                control={form.control}
+                name="downloadUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-muted-foreground">
+                      {editing ? "下载地址（可修改自定义链接）" : "下载地址（上传文件后可留空，也可填写自定义链接覆盖）"}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://.../app-release.apk"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
