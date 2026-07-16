@@ -1,11 +1,7 @@
 "use client";
 
-// XingTone - 歌曲管理
-// 列表（封面/标题/歌手/专辑/时长/播放量/状态/操作）+ 搜索 + 状态/专辑筛选 + 分页
-// 新增/编辑 Dialog 表单 + 标签多选 + 批量上传 + 删除二次确认
-// 对接 CRUD /api/admin/songs，标签 /api/admin/tags，专辑 /api/admin/albums
 import { useCallback, useEffect, useState } from "react";
-import { Plus, UploadCloud } from "lucide-react";
+import { Plus, UploadCloud, Trash2, Eye, EyeOff } from "lucide-react";
 
 import { request } from "@/lib/api";
 import type { Album, Artist, PageResult, Song, Tag } from "@/lib/types";
@@ -30,7 +26,6 @@ import { BatchUploadDialog } from "./batch-upload-dialog";
 export default function SongsPage() {
   const { toast } = useToast();
 
-  // 列表数据
   const [data, setData] = useState<Song[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -40,22 +35,22 @@ export default function SongsPage() {
   const [albumFilter, setAlbumFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(false);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
-  // 关联数据
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
 
-  // 弹窗状态
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Song | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Song | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
 
-  // 搜索 debounce
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [batchStatusTarget, setBatchStatusTarget] = useState<"PUBLISHED" | "DRAFT" | null>(null);
+
   const debouncedKeyword = useDebounced(keyword, 300);
 
-  // 加载列表
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
@@ -70,7 +65,6 @@ export default function SongsPage() {
           albumId: albumFilter !== "ALL" ? albumFilter : undefined,
         },
       });
-      // 后端返回 songTags 关联表，映射为前端期望的 tags 数组
       const mapped = (res.list ?? []).map((s) => ({
         ...s,
         tags: s.songTags?.map((st) => st.tag) ?? [],
@@ -88,7 +82,6 @@ export default function SongsPage() {
     }
   }, [page, debouncedKeyword, statusFilter, albumFilter, toast]);
 
-  // 加载专辑与标签（下拉/多选用）
   const loadOptions = useCallback(async () => {
     try {
       const [albumRes, tagRes, artistRes] = await Promise.all([
@@ -120,24 +113,20 @@ export default function SongsPage() {
     void loadOptions();
   }, [loadOptions]);
 
-  // 搜索/筛选变化时回到第一页
   useEffect(() => {
     setPage(1);
   }, [debouncedKeyword, statusFilter, albumFilter]);
 
-  // 打开新增弹窗
   function handleAdd() {
     setEditing(null);
     setFormOpen(true);
   }
-  // 打开编辑弹窗
   function handleEdit(song: Song) {
     setEditing(song);
     setSelectedRowKey(song.id);
     setFormOpen(true);
   }
 
-  // 删除确认
   async function handleDelete() {
     if (!deleteTarget) return;
     try {
@@ -147,7 +136,6 @@ export default function SongsPage() {
       });
       toast({ title: "删除成功" });
       setDeleteTarget(null);
-      // 删除后若当前页空了，回退一页
       if (data.length === 1 && page > 1) {
         setPage(page - 1);
       } else {
@@ -162,7 +150,48 @@ export default function SongsPage() {
     }
   }
 
-  // 表格列定义
+  async function handleBatchDelete() {
+    if (selectedRowKeys.length === 0) return;
+    try {
+      await request({
+        method: "POST",
+        url: "/admin/songs/batch/delete",
+        data: { ids: selectedRowKeys },
+      });
+      toast({ title: "批量删除成功" });
+      setBatchDeleteOpen(false);
+      setSelectedRowKeys([]);
+      void loadList();
+    } catch (err) {
+      toast({
+        title: "删除失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleBatchStatus() {
+    if (!batchStatusTarget || selectedRowKeys.length === 0) return;
+    try {
+      await request({
+        method: "POST",
+        url: "/admin/songs/batch/status",
+        data: { ids: selectedRowKeys, status: batchStatusTarget },
+      });
+      toast({ title: batchStatusTarget === "PUBLISHED" ? "已批量发布" : "已批量设为草稿" });
+      setBatchStatusTarget(null);
+      setSelectedRowKeys([]);
+      void loadList();
+    } catch (err) {
+      toast({
+        title: "操作失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  }
+
   const columns = getSongColumns({
     onEdit: handleEdit,
     onDelete: (song) => setDeleteTarget(song),
@@ -203,6 +232,38 @@ export default function SongsPage() {
         searchValue={keyword}
         onSearchChange={setKeyword}
         searchPlaceholder="搜索标题 / 歌手"
+        selectable
+        selectedRowKeys={selectedRowKeys}
+        onSelectionChange={setSelectedRowKeys}
+        batchActions={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchStatusTarget("PUBLISHED")}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              批量发布
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchStatusTarget("DRAFT")}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              批量设为草稿
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              批量删除
+            </Button>
+          </>
+        }
         filters={
           <>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -232,7 +293,6 @@ export default function SongsPage() {
         }
       />
 
-      {/* 新增/编辑弹窗：始终挂载，仅用 open 控制开关，避免条件挂载与受控 open 叠加导致的生命周期异常 */}
       <SongFormDialog
         open={formOpen}
         onOpenChange={(o) => {
@@ -254,14 +314,12 @@ export default function SongsPage() {
         }}
       />
 
-      {/* 批量上传弹窗 */}
       <BatchUploadDialog
         open={batchOpen}
         onOpenChange={setBatchOpen}
         onSuccess={() => void loadList()}
       />
 
-      {/* 删除二次确认 */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
@@ -274,6 +332,25 @@ export default function SongsPage() {
         confirmText="删除"
         variant="destructive"
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
+        title="批量删除歌曲"
+        description={`确定要删除选中的 ${selectedRowKeys.length} 首歌曲吗？此操作不可撤销。`}
+        confirmText="批量删除"
+        variant="destructive"
+        onConfirm={handleBatchDelete}
+      />
+
+      <ConfirmDialog
+        open={batchStatusTarget !== null}
+        onOpenChange={(o) => !o && setBatchStatusTarget(null)}
+        title={batchStatusTarget === "PUBLISHED" ? "批量发布歌曲" : "批量设为草稿"}
+        description={`确定要将选中的 ${selectedRowKeys.length} 首歌曲${batchStatusTarget === "PUBLISHED" ? "发布" : "设为草稿"}吗？`}
+        confirmText={batchStatusTarget === "PUBLISHED" ? "批量发布" : "批量设为草稿"}
+        onConfirm={handleBatchStatus}
       />
     </div>
   );

@@ -1,12 +1,7 @@
 "use client";
 
-// XingTone - 用户管理
-// 列表（头像/用户名/角色/收藏/歌单/最近登录/注册时间/状态/操作）+ 搜索 + 分页
-// 禁用/启用：Switch 切换（基于软删除 deletedAt）
-// 设置管理员：按钮 + 二次确认（切换 role USER/ADMIN）
-// 对接 CRUD /api/admin/users，恢复 /api/admin/users/:id/restore
 import { useCallback, useEffect, useState } from "react";
-import { Shield, ShieldOff } from "lucide-react";
+import { Shield, ShieldOff, Pencil, Users, UserCheck, UserX } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
@@ -19,6 +14,23 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function UsersPage() {
@@ -30,16 +42,19 @@ export default function UsersPage() {
   const pageSize = 10;
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
-  // 正在切换禁用状态的用户 id
   const [togglingId, setTogglingId] = useState<string | null>(null);
-
-  // 角色变更确认
   const [roleTarget, setRoleTarget] = useState<User | null>(null);
-
-  // 禁用/启用切换确认目标
   const [toggleTarget, setToggleTarget] = useState<User | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({ username: "", email: "", avatar: "", role: "USER" as Role });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [batchRoleTarget, setBatchRoleTarget] = useState<Role | null>(null);
+  const [batchDisableTarget, setBatchDisableTarget] = useState<boolean | null>(null);
 
   const debouncedKeyword = useDebounced(keyword, 300);
 
@@ -53,7 +68,6 @@ export default function UsersPage() {
           page,
           pageSize,
           keyword: debouncedKeyword || undefined,
-          // 包含已禁用用户，便于管理
           includeDisabled: true,
         },
       });
@@ -78,8 +92,6 @@ export default function UsersPage() {
     setPage(1);
   }, [debouncedKeyword]);
 
-  // 禁用 / 启用切换（基于软删除 deletedAt）
-  // 后端契约：PUT /api/admin/users/:id/status，body { disabled: boolean }
   async function handleToggleDisabled(user: User) {
     setTogglingId(user.id);
     try {
@@ -103,7 +115,6 @@ export default function UsersPage() {
     }
   }
 
-  // 设置 / 取消管理员
   async function handleRoleChange() {
     if (!roleTarget) return;
     const next: Role = roleTarget.role === "ADMIN" ? "USER" : "ADMIN";
@@ -117,6 +128,85 @@ export default function UsersPage() {
         title: next === "ADMIN" ? "已设为管理员" : "已取消管理员",
       });
       setRoleTarget(null);
+      void loadList();
+    } catch (err) {
+      toast({
+        title: "操作失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function handleEdit(user: User) {
+    setEditingUser(user);
+    setEditForm({
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar ?? "",
+      role: user.role,
+    });
+    setEditOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingUser) return;
+    setEditSaving(true);
+    try {
+      await request({
+        method: "PATCH",
+        url: `/admin/users/${editingUser.id}`,
+        data: editForm,
+      });
+      toast({ title: "保存成功" });
+      setEditOpen(false);
+      setEditingUser(null);
+      void loadList();
+    } catch (err) {
+      toast({
+        title: "保存失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleBatchRoleChange() {
+    if (!batchRoleTarget || selectedRowKeys.length === 0) return;
+    try {
+      await request({
+        method: "POST",
+        url: "/admin/users/batch/role",
+        data: { ids: selectedRowKeys, role: batchRoleTarget },
+      });
+      toast({
+        title: batchRoleTarget === "ADMIN" ? "已批量设为管理员" : "已批量取消管理员",
+      });
+      setBatchRoleTarget(null);
+      setSelectedRowKeys([]);
+      void loadList();
+    } catch (err) {
+      toast({
+        title: "操作失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleBatchStatusChange() {
+    if (batchDisableTarget === null || selectedRowKeys.length === 0) return;
+    try {
+      await request({
+        method: "POST",
+        url: "/admin/users/batch/status",
+        data: { ids: selectedRowKeys, disabled: batchDisableTarget },
+      });
+      toast({ title: batchDisableTarget ? "已批量禁用" : "已批量启用" });
+      setBatchDisableTarget(null);
+      setSelectedRowKeys([]);
       void loadList();
     } catch (err) {
       toast({
@@ -142,6 +232,7 @@ export default function UsersPage() {
       ),
     },
     { key: "username", title: "用户名", render: (row) => <span className="font-medium">{row.username}</span> },
+    { key: "email", title: "邮箱", width: 200, render: (row) => <span className="text-muted-foreground">{row.email}</span> },
     {
       key: "role",
       title: "角色",
@@ -156,7 +247,7 @@ export default function UsersPage() {
     {
       key: "favoriteCount",
       title: "收藏",
-      width: 80,
+      width: 70,
       render: (row) => (
         <span className="text-muted-foreground">{row._count?.favorites ?? 0}</span>
       ),
@@ -164,7 +255,7 @@ export default function UsersPage() {
     {
       key: "playlistCount",
       title: "歌单",
-      width: 80,
+      width: 70,
       render: (row) => (
         <span className="text-muted-foreground">{row._count?.playlists ?? 0}</span>
       ),
@@ -193,7 +284,6 @@ export default function UsersPage() {
       width: 110,
       render: (row) => (
         <div className="flex items-center gap-2">
-          {/* 禁用/启用 Switch：开启态（正常）primary-700；切换前二次确认 */}
           <Switch
             checked={!row.deletedAt}
             onCheckedChange={() => setToggleTarget(row)}
@@ -210,33 +300,41 @@ export default function UsersPage() {
     {
       key: "actions",
       title: "操作",
-      width: 140,
+      width: 240,
       render: (row) => (
-        <Button
-          variant="outline"
-          size="sm"
-          className={
-            row.role === "ADMIN"
-              ? "h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              : "h-8"
-          }
-          onClick={() => {
-            setSelectedRowKey(row.id);
-            setRoleTarget(row);
-          }}
-        >
-          {row.role === "ADMIN" ? (
-            <>
-              <ShieldOff className="h-3.5 w-3.5" />
-              取消管理员
-            </>
-          ) : (
-            <>
-              <Shield className="h-3.5 w-3.5" />
-              设为管理员
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => handleEdit(row)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            编辑
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className={
+              row.role === "ADMIN"
+                ? "h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                : "h-8"
+            }
+            onClick={() => setRoleTarget(row)}
+          >
+            {row.role === "ADMIN" ? (
+              <>
+                <ShieldOff className="h-3.5 w-3.5" />
+                取消管理员
+              </>
+            ) : (
+              <>
+                <Shield className="h-3.5 w-3.5" />
+                设为管理员
+              </>
+            )}
+          </Button>
+        </div>
       ),
     },
   ];
@@ -253,7 +351,6 @@ export default function UsersPage() {
         data={data}
         loading={loading}
         rowKey={(row) => row.id}
-        selectedRowKey={selectedRowKey}
         page={page}
         pageSize={pageSize}
         total={total}
@@ -261,17 +358,50 @@ export default function UsersPage() {
         searchValue={keyword}
         onSearchChange={setKeyword}
         searchPlaceholder="搜索用户名 / 邮箱"
+        selectable
+        selectedRowKeys={selectedRowKeys}
+        onSelectionChange={setSelectedRowKeys}
+        batchActions={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchRoleTarget("ADMIN")}
+            >
+              <Users className="h-3.5 w-3.5" />
+              批量设为管理员
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchRoleTarget("USER")}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              批量取消管理员
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchDisableTarget(true)}
+            >
+              <UserX className="h-3.5 w-3.5" />
+              批量禁用
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBatchDisableTarget(false)}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              批量启用
+            </Button>
+          </>
+        }
       />
 
-      {/* 设置/取消管理员二次确认 */}
       <ConfirmDialog
         open={!!roleTarget}
-        onOpenChange={(o) => {
-          if (!o) {
-            setRoleTarget(null);
-            setSelectedRowKey(null);
-          }
-        }}
+        onOpenChange={(o) => !o && setRoleTarget(null)}
         title={roleTarget?.role === "ADMIN" ? "取消管理员" : "设为管理员"}
         description={
           roleTarget
@@ -285,12 +415,9 @@ export default function UsersPage() {
         onConfirm={handleRoleChange}
       />
 
-      {/* 禁用/启用用户二次确认：避免误操作影响登录 */}
       <ConfirmDialog
         open={!!toggleTarget}
-        onOpenChange={(o) => {
-          if (!o) setToggleTarget(null);
-        }}
+        onOpenChange={(o) => !o && setToggleTarget(null)}
         title={toggleTarget && !toggleTarget.deletedAt ? "禁用用户" : "启用用户"}
         description={
           toggleTarget
@@ -299,15 +426,107 @@ export default function UsersPage() {
               : `确定禁用用户「${toggleTarget.username}」吗？禁用后该用户将无法登录。`
             : ""
         }
-        confirmText={
-          toggleTarget && !toggleTarget.deletedAt ? "禁用" : "启用"
-        }
-        variant={
-          toggleTarget && !toggleTarget.deletedAt ? "destructive" : "default"
-        }
+        confirmText={toggleTarget && !toggleTarget.deletedAt ? "禁用" : "启用"}
+        variant={toggleTarget && !toggleTarget.deletedAt ? "destructive" : "default"}
         onConfirm={() => {
           if (toggleTarget) void handleToggleDisabled(toggleTarget);
         }}
+      />
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditOpen(false);
+            setEditingUser(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑用户信息</DialogTitle>
+            <DialogDescription>
+              修改用户「{editingUser?.username}」的基本信息和权限设置
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>用户名</Label>
+              <Input
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                placeholder="请输入用户名"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>邮箱</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="请输入邮箱"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>头像 URL</Label>
+              <Input
+                value={editForm.avatar}
+                onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                placeholder="请输入头像图片地址"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>角色</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(v) => setEditForm({ ...editForm, role: v as Role })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USER">普通用户</SelectItem>
+                  <SelectItem value="ADMIN">管理员</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditOpen(false);
+                setEditingUser(null);
+              }}
+              disabled={editSaving}
+            >
+              取消
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={editSaving}>
+              {editSaving ? "保存中..." : "保存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={batchRoleTarget !== null}
+        onOpenChange={(o) => !o && setBatchRoleTarget(null)}
+        title={batchRoleTarget === "ADMIN" ? "批量设为管理员" : "批量取消管理员"}
+        description={`确定要将选中的 ${selectedRowKeys.length} 个用户${batchRoleTarget === "ADMIN" ? "设为管理员" : "取消管理员"}吗？`}
+        confirmText={batchRoleTarget === "ADMIN" ? "批量设为管理员" : "批量取消管理员"}
+        variant={batchRoleTarget === "ADMIN" ? "default" : "destructive"}
+        onConfirm={handleBatchRoleChange}
+      />
+
+      <ConfirmDialog
+        open={batchDisableTarget !== null}
+        onOpenChange={(o) => !o && setBatchDisableTarget(null)}
+        title={batchDisableTarget ? "批量禁用用户" : "批量启用用户"}
+        description={`确定要将选中的 ${selectedRowKeys.length} 个用户${batchDisableTarget ? "禁用" : "启用"}吗？`}
+        confirmText={batchDisableTarget ? "批量禁用" : "批量启用"}
+        variant={batchDisableTarget ? "destructive" : "default"}
+        onConfirm={handleBatchStatusChange}
       />
     </div>
   );

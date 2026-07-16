@@ -1,6 +1,6 @@
 "use client";
 
-// 通用数据表格：列配置 + 分页 + 搜索 + 筛选区 + 选中行高亮
+// 通用数据表格：列配置 + 分页 + 搜索 + 筛选区 + 选中行高亮 + 多选
 // 各业务页面传入 columns、data、分页状态与回调即可复用
 import { ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
@@ -18,17 +18,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export interface DataTableColumn<T> {
-  // 列唯一标识
   key: string;
-  // 表头标题
   title: string;
-  // 自定义单元格渲染
   render?: (row: T, index: number) => ReactNode;
-  // 单元格类名
   className?: string;
-  // 表头类名
   headClassName?: string;
-  // 列宽
   width?: string | number;
 }
 
@@ -36,27 +30,23 @@ export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   loading?: boolean;
-  // 行 key 取值
   rowKey: (row: T) => string;
-  // 选中行 id（用于高亮，亮色 primary-50 / 暗色 primary-900/20）
   selectedRowKey?: string | null;
-  // 分页
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
-  // 搜索（受控）
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
-  // 筛选区（任意 ReactNode，例如 Select）
   filters?: ReactNode;
-  // 顶部右侧操作区（如新增按钮）
   toolbar?: ReactNode;
-  // 空状态文案
   emptyText?: string;
-  // 是否显示分页（默认显示）
   showPagination?: boolean;
+  selectable?: boolean;
+  selectedRowKeys?: string[];
+  onSelectionChange?: (keys: string[]) => void;
+  batchActions?: ReactNode;
 }
 
 export function DataTable<T>({
@@ -76,14 +66,40 @@ export function DataTable<T>({
   toolbar,
   emptyText = "暂无数据",
   showPagination = true,
+  selectable = false,
+  selectedRowKeys = [],
+  onSelectionChange,
+  batchActions,
 }: DataTableProps<T>) {
-  // 总页数（至少 1 页，避免分页器显示 0）
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const showToolbar = !!onSearchChange || !!filters || !!toolbar;
+  const colCount = columns.length + (selectable ? 1 : 0);
+
+  const allSelected = data.length > 0 && data.every((row) => selectedRowKeys.includes(rowKey(row)));
+  const someSelected = data.some((row) => selectedRowKeys.includes(rowKey(row)));
+
+  const toggleAll = () => {
+    if (!onSelectionChange) return;
+    if (allSelected) {
+      onSelectionChange(selectedRowKeys.filter((k) => !data.some((row) => rowKey(row) === k)));
+    } else {
+      const currentKeys = data.map(rowKey);
+      const merged = Array.from(new Set([...selectedRowKeys, ...currentKeys]));
+      onSelectionChange(merged);
+    }
+  };
+
+  const toggleRow = (key: string) => {
+    if (!onSelectionChange) return;
+    if (selectedRowKeys.includes(key)) {
+      onSelectionChange(selectedRowKeys.filter((k) => k !== key));
+    } else {
+      onSelectionChange([...selectedRowKeys, key]);
+    }
+  };
 
   return (
     <div className="space-y-3">
-      {/* 顶部工具栏：搜索 + 筛选 + 操作 */}
       {showToolbar && (
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -104,11 +120,31 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* 表格主体 */}
+      {selectable && selectedRowKeys.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-2">
+          <span className="text-sm text-muted-foreground">
+            已选择 <span className="font-medium text-primary">{selectedRowKeys.length}</span> 项
+          </span>
+          {batchActions && <div className="flex items-center gap-2">{batchActions}</div>}
+        </div>
+      )}
+
       <div className="rounded-xl border border-border/60 bg-card">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              {selectable && (
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer rounded border-border accent-primary-700"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                    onChange={toggleAll}
+                    disabled={loading || data.length === 0}
+                  />
+                </TableHead>
+              )}
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
@@ -122,9 +158,9 @@ export function DataTable<T>({
           </TableHeader>
           <TableBody>
             {loading ? (
-              // 加载骨架：渲染与列数一致的骨架行
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
+                  {selectable && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                   {columns.map((col) => (
                     <TableCell key={col.key}>
                       <Skeleton className="h-6 w-full max-w-[160px]" />
@@ -135,7 +171,7 @@ export function DataTable<T>({
             ) : data.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={colCount}
                   className="h-32 text-center text-sm text-muted-foreground"
                 >
                   {emptyText}
@@ -144,16 +180,25 @@ export function DataTable<T>({
             ) : (
               data.map((row, index) => {
                 const key = rowKey(row);
-                const selected = selectedRowKey === key;
+                const selected = selectedRowKey === key || selectedRowKeys.includes(key);
                 return (
                   <TableRow
                     key={key}
-                    // 选中行背景：亮色 primary-50 / 暗色 primary-900/20
                     className={cn(
                       selected &&
                         "bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-50 dark:hover:bg-primary-900/20"
                     )}
                   >
+                    {selectable && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 cursor-pointer rounded border-border accent-primary-700"
+                          checked={selectedRowKeys.includes(key)}
+                          onChange={() => toggleRow(key)}
+                        />
+                      </TableCell>
+                    )}
                     {columns.map((col) => (
                       <TableCell
                         key={col.key}
@@ -172,7 +217,6 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {/* 分页器 */}
       {showPagination && (
         <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
           <p className="text-xs text-muted-foreground">
