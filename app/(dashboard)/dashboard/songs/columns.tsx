@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Copy, Check } from "lucide-react";
+import { useState } from "react";
 
 import type { Song } from "@/lib/types";
 import { formatDuration, formatPlays } from "@/lib/admin-utils";
@@ -14,10 +15,50 @@ export interface SongColumnsOptions {
   onDelete: (song: Song) => void;
 }
 
+function CopyableId({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+        {id.slice(0, 8)}…
+      </code>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={handleCopy}
+        title="复制完整 ID"
+      >
+        {copied ? (
+          <Check className="h-3 w-3 text-emerald-500" />
+        ) : (
+          <Copy className="h-3 w-3" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
 // 歌曲列表表格列定义
 export function getSongColumns(options: SongColumnsOptions): DataTableColumn<Song>[] {
   const { onEdit, onDelete } = options;
   return [
+    {
+      key: "id",
+      title: "ID",
+      width: 120,
+      render: (row) => <CopyableId id={row.id} />,
+    },
     {
       key: "cover",
       title: "封面",

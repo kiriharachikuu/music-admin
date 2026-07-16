@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Music2, X, Search } from "lucide-react";
 
 import { request } from "@/lib/api";
-import type { Banner } from "@/lib/types";
+import type { Banner, Song } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { FileUpload } from "@/components/admin/file-upload";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ import {
   bannerSchema,
   type BannerFormValues,
 } from "./schema";
+import { SongSelector } from "./song-selector";
+import { resolveMediaUrl } from "@/lib/utils";
 
 // ==================== Banner 新增/编辑表单弹窗 ====================
 export interface BannerFormDialogProps {
@@ -57,6 +59,8 @@ export function BannerFormDialog({
 }: BannerFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [songSelectorOpen, setSongSelectorOpen] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
 
   const form = useForm<BannerFormValues>({
     resolver: zodResolver(bannerSchema),
@@ -75,8 +79,24 @@ export function BannerFormDialog({
         sort: editing.sort,
         status: editing.status,
       });
+      if (editing.songId) {
+        void (async () => {
+          try {
+            const song = await request<Song>({
+              method: "GET",
+              url: `/admin/songs/${editing.songId}`,
+            });
+            setSelectedSong(song);
+          } catch {
+            setSelectedSong(null);
+          }
+        })();
+      } else {
+        setSelectedSong(null);
+      }
     } else {
       form.reset(bannerFormDefaultValues);
+      setSelectedSong(null);
     }
   }, [open, editing, form]);
 
@@ -153,50 +173,120 @@ export function BannerFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="linkUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>内部跳转链接（可选，优先级最低）</FormLabel>
-                  <FormControl>
-                    <Input placeholder="/library 或 https://..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="songId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>关联歌曲 ID（可选，优先级最高）</FormLabel>
+                    <FormLabel>关联歌曲（可选，优先级最高）</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="粘贴歌曲 ID，点击即播放"
-                        {...field}
-                      />
+                      <div>
+                        {selectedSong ? (
+                          <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+                              {selectedSong.coverUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={resolveMediaUrl(selectedSong.coverUrl)}
+                                  alt={selectedSong.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-muted-foreground/40">
+                                  <Music2 className="h-5 w-5" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-foreground">
+                                {selectedSong.title}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {selectedSong.artist}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedSong(null);
+                                field.onChange("");
+                              }}
+                              aria-label="移除关联"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-center gap-2"
+                            onClick={() => setSongSelectorOpen(true)}
+                          >
+                            <Search className="h-4 w-4" />
+                            选择歌曲
+                          </Button>
+                        )}
+                        <SongSelector
+                          open={songSelectorOpen}
+                          onOpenChange={(v) => {
+                            setSongSelectorOpen(v);
+                            if (!v && !selectedSong && field.value) {
+                              void (async () => {
+                                try {
+                                  const song = await request<Song>({
+                                    method: "GET",
+                                    url: `/admin/songs/${field.value}`,
+                                  });
+                                  setSelectedSong(song);
+                                } catch {
+                                  setSelectedSong(null);
+                                }
+                              })();
+                            }
+                          }}
+                          onSelect={(song) => {
+                            setSelectedSong(song);
+                            field.onChange(song.id);
+                          }}
+                        />
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="adUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>广告外链（可选，优先级中）</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="linkUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>内部跳转链接（可选，优先级最低）</FormLabel>
+                      <FormControl>
+                        <Input placeholder="/library 或 https://..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="adUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>广告外链（可选，优先级中）</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
