@@ -144,6 +144,42 @@ export interface Banner {
   updatedAt: string;
 }
 
+/** 直播片段 */
+export interface LiveClip {
+  id: string;
+  title: string;
+  artist: string;
+  sessionId: string;
+  session?: { id: string; title: string };
+  trackIndex: number;
+  duration: number;
+  fileUrl: string;
+  coverUrl?: string | null;
+  lyricUrl?: string | null;
+  status: SongStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 直播场次 */
+export interface LiveSession {
+  id: string;
+  title: string;
+  artist: string;
+  cover?: string | null;
+  description?: string | null;
+  liveTime: string;
+  songCount: number;
+  status: SongStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 直播场次详情（含片段列表） */
+export interface LiveSessionDetail extends LiveSession {
+  clips: LiveClip[];
+}
+
 /** 看板统计 */
 export interface StatsData {
   totalUsers: number;
