@@ -20,6 +20,8 @@ import {
   TrendingUp,
   ScrollText,
   Mic,
+  Radio,
+  Music2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -57,6 +59,8 @@ const MENU: MenuItem[] = [
   { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
   { label: "专辑管理", href: "/dashboard/albums", icon: Disc3 },
   { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
+  { label: "直播场次", href: "/dashboard/live-sessions", icon: Radio },
+  { label: "直播歌切", href: "/dashboard/live-clips", icon: Music2 },
   { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
   { label: "用户管理", href: "/dashboard/users", icon: Users },
   { label: "排行榜", href: "/dashboard/rankings", icon: TrendingUp },

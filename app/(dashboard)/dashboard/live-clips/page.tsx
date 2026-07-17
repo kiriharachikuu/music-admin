@@ -221,9 +221,21 @@ export default function LiveClipsPage() {
     { key: "artist", title: "歌手" },
     {
       key: "session",
-      title: "所属场次",
-      render: (row) =>
-        row.session?.title || <span className="text-muted-foreground">-</span>,
+      title: "所属场次（日期）",
+      render: (row) => {
+        if (!row.session?.title) return <span className="text-muted-foreground">-</span>;
+        const dateStr = row.session?.liveTime
+          ? new Date(row.session.liveTime).toLocaleDateString("zh-CN")
+          : null;
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{row.session.title}</span>
+            {dateStr && (
+              <span className="text-xs text-muted-foreground">{dateStr}</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "trackIndex",

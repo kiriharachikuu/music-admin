@@ -150,7 +150,8 @@ export interface LiveClip {
   title: string;
   artist: string;
   sessionId: string;
-  session?: { id: string; title: string };
+  /** 所属场次信息（含直播时间，用于区分同歌不同场次） */
+  session?: { id: string; title: string; liveTime?: string };
   trackIndex: number;
   duration: number;
   fileUrl: string;
