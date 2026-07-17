@@ -46,6 +46,7 @@ import {
 const liveSessionSchema = z.object({
   title: z.string().min(1, "请输入标题"),
   artist: z.string(),
+  sessionNumber: z.string().optional(),
   liveTime: z.string().min(1, "请选择直播时间"),
   cover: z.string(),
   description: z.string(),
@@ -214,6 +215,13 @@ export default function LiveSessionsPage() {
       render: (row) => <span className="font-medium">{row.title}</span>,
     },
     { key: "artist", title: "歌手" },
+    {
+      key: "sessionNumber",
+      title: "编号",
+      width: 80,
+      render: (row) =>
+        row.sessionNumber != null ? `#${row.sessionNumber}` : "-",
+    },
     {
       key: "songCount",
       title: "歌切数量",
@@ -418,6 +426,7 @@ function LiveSessionFormDialog({
     defaultValues: {
       title: "",
       artist: "",
+      sessionNumber: "",
       liveTime: "",
       cover: "",
       description: "",
@@ -431,6 +440,7 @@ function LiveSessionFormDialog({
       form.reset({
         title: editing.title,
         artist: editing.artist || "",
+        sessionNumber: editing.sessionNumber != null ? String(editing.sessionNumber) : "",
         liveTime: editing.liveTime?.slice(0, 16) || "",
         cover: editing.cover || "",
         description: editing.description || "",
@@ -440,6 +450,7 @@ function LiveSessionFormDialog({
       form.reset({
         title: "",
         artist: "",
+        sessionNumber: "",
         liveTime: new Date().toISOString().slice(0, 16),
         cover: "",
         description: "",
@@ -451,18 +462,25 @@ function LiveSessionFormDialog({
   async function onSubmit(values: LiveSessionFormValues) {
     setSubmitting(true);
     try {
+      const payload = {
+        ...values,
+        sessionNumber:
+          values.sessionNumber && values.sessionNumber !== ""
+            ? Number(values.sessionNumber)
+            : undefined,
+      };
       if (editing) {
         await request({
           method: "PUT",
           url: `/admin/live-sessions/${editing.id}`,
-          data: values,
+          data: payload,
         });
         toast({ title: "保存成功" });
       } else {
         await request({
           method: "POST",
           url: "/admin/live-sessions",
-          data: values,
+          data: payload,
         });
         toast({ title: "新增成功" });
       }
@@ -513,6 +531,24 @@ function LiveSessionFormDialog({
                   <FormLabel>歌手</FormLabel>
                   <FormControl>
                     <Input placeholder="请输入歌手名称" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sessionNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>场次编号</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="如 1, 2, 3..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

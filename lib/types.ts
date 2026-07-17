@@ -170,6 +170,8 @@ export interface LiveSession {
   description?: string | null;
   liveTime: string;
   songCount: number;
+  /** 场次编号 */
+  sessionNumber?: number | null;
   status: SongStatus;
   createdAt: string;
   updatedAt: string;
