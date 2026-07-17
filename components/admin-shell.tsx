@@ -134,7 +134,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [userRole, setUserRole] = useState<string>("USER");
 
   useEffect(() => {
-    const user = getUser();
+    const user = getUser<{ role?: string }>();
     setUserRole(user?.role || "USER");
   }, []);
 
