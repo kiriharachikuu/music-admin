@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -22,6 +22,11 @@ import {
   Mic,
   Radio,
   Music2,
+  ChevronDown,
+  Folder,
+  Video,
+  BarChart3,
+  Wrench,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -49,24 +54,64 @@ interface MenuItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  // 精确匹配（仅 pathname === href 时高亮），用于 /dashboard 避免子路由误高亮
   exact?: boolean;
 }
 
-const MENU: MenuItem[] = [
-  { label: "数据看板", href: "/dashboard", icon: LayoutDashboard, exact: true },
-  { label: "歌曲管理", href: "/dashboard/songs", icon: Music },
-  { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
-  { label: "专辑管理", href: "/dashboard/albums", icon: Disc3 },
-  { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
-  { label: "直播场次", href: "/dashboard/live-sessions", icon: Radio },
-  { label: "直播歌切", href: "/dashboard/live-clips", icon: Music2 },
-  { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
-  { label: "用户管理", href: "/dashboard/users", icon: Users },
-  { label: "排行榜", href: "/dashboard/rankings", icon: TrendingUp },
-  { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
-  { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
-  { label: "系统设置", href: "/dashboard/settings", icon: Settings },
+interface MenuGroup {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: MenuItem[];
+}
+
+// 检查菜单组中是否有激活项
+function hasActiveChild(group: MenuGroup, pathname: string): boolean {
+  return group.children.some((item) => isActive(item, pathname));
+}
+
+const MENU_GROUPS: MenuGroup[] = [
+  {
+    label: "概览",
+    icon: LayoutDashboard,
+    children: [
+      { label: "数据看板", href: "/dashboard", icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: "内容管理",
+    icon: Folder,
+    children: [
+      { label: "歌曲管理", href: "/dashboard/songs", icon: Music },
+      { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
+      { label: "专辑管理", href: "/dashboard/albums", icon: Disc3 },
+      { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
+    ],
+  },
+  {
+    label: "直播相关",
+    icon: Video,
+    children: [
+      { label: "直播场次", href: "/dashboard/live-sessions", icon: Radio },
+      { label: "直播歌切", href: "/dashboard/live-clips", icon: Music2 },
+    ],
+  },
+  {
+    label: "运营管理",
+    icon: BarChart3,
+    children: [
+      { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
+      { label: "用户管理", href: "/dashboard/users", icon: Users },
+      { label: "排行榜", href: "/dashboard/rankings", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "系统管理",
+    icon: Wrench,
+    children: [
+      { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
+      { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
+      { label: "系统设置", href: "/dashboard/settings", icon: Settings },
+    ],
+  },
 ];
 
 // 判断菜单项是否处于激活态
@@ -78,6 +123,35 @@ function isActive(item: MenuItem, pathname: string) {
 // 侧边栏内容（桌面固定栏与移动端抽屉共用）
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // 初始化时展开包含激活项的分组
+  useEffect(() => {
+    const groupsToExpand = new Set<string>();
+    MENU_GROUPS.forEach((group) => {
+      if (hasActiveChild(group, pathname)) {
+        groupsToExpand.add(group.label);
+      }
+    });
+    setExpandedGroups((prev) => {
+      const merged = new Set([...prev, ...groupsToExpand]);
+      return merged;
+    });
+  }, [pathname]);
+
+  // 切换分组展开状态
+  const toggleGroup = useCallback((groupLabel: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupLabel)) {
+        next.delete(groupLabel);
+      } else {
+        next.add(groupLabel);
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       {/* 品牌 Logo */}
@@ -95,26 +169,89 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       {/* 菜单列表 */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {MENU.map((item) => {
-          const active = isActive(item, pathname);
-          const Icon = item.icon;
+        {MENU_GROUPS.map((group) => {
+          const GroupIcon = group.icon;
+          const isExpanded = expandedGroups.has(group.label);
+          const groupHasActive = hasActiveChild(group, pathname);
+          // 概览分组只有一个数据看板，直接显示为单个菜单项
+          if (group.children.length === 1) {
+            const item = group.children[0];
+            const active = isActive(item, pathname);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary-700 text-white shadow-sm shadow-primary-700/30"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          }
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? // 选中态：primary-700 实心背景 + 白字
-                    "bg-primary-700 text-white shadow-sm shadow-primary-700/30"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
+            <div key={group.label} className="space-y-1">
+              {/* 分组标题按钮 */}
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  groupHasActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <GroupIcon className="h-4 w-4 shrink-0" />
+                  <span>{group.label}</span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-transform duration-200",
+                    isExpanded && "rotate-180"
+                  )}
+                />
+              </button>
+              {/* 子菜单列表 */}
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-200 ease-in-out",
+                  isExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                )}
+              >
+                <div className="space-y-1 pl-3">
+                  {group.children.map((item) => {
+                    const active = isActive(item, pathname);
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={onNavigate}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "bg-primary-700 text-white shadow-sm shadow-primary-700/30"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           );
         })}
       </nav>
@@ -142,7 +279,7 @@ function Topbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
 
   // 当前页面标题：依据路径匹配菜单项
   const current =
-    MENU.find((m) => isActive(m, pathname))?.label || "XingTone管理后台";
+    MENU_GROUPS.flatMap((g) => g.children).find((m) => isActive(m, pathname))?.label || "XingTone管理后台";
 
   function handleLogout() {
     clearAuth();
