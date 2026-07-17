@@ -477,9 +477,10 @@ function LiveSessionFormDialog({
     setSubmitting(true);
     try {
       // 将 datetime-local 格式转换为完整的 ISO-8601 格式
-      const liveTimeISO = values.liveTime.includes(":00")
-        ? values.liveTime
-        : `${values.liveTime}:00`;
+      // datetime-local 返回 "2026-07-17T14:42" 格式，需要转换为完整 ISO 格式
+      const liveTimeISO = values.liveTime.length === 16
+        ? `${values.liveTime}:00.000Z`
+        : values.liveTime;
 
       const payload = {
         ...values,
