@@ -8,7 +8,7 @@ import { Loader2, Pencil, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
-import type { LiveSession, PageResult, SongStatus } from "@/lib/types";
+import type { Artist, LiveSession, PageResult, SongStatus } from "@/lib/types";
 import { formatDate, useDebounced } from "@/lib/admin-utils";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
@@ -45,8 +45,7 @@ import {
 
 const liveSessionSchema = z.object({
   title: z.string().min(1, "请输入标题"),
-  artist: z.string(),
-  sessionNumber: z.string().optional(),
+  artist: z.string().min(1, "请选择歌手"),
   liveTime: z.string().min(1, "请选择直播时间"),
   cover: z.string(),
   description: z.string(),
@@ -215,13 +214,6 @@ export default function LiveSessionsPage() {
       render: (row) => <span className="font-medium">{row.title}</span>,
     },
     { key: "artist", title: "歌手" },
-    {
-      key: "sessionNumber",
-      title: "编号",
-      width: 80,
-      render: (row) =>
-        row.sessionNumber != null ? `#${row.sessionNumber}` : "-",
-    },
     {
       key: "songCount",
       title: "歌切数量",
@@ -420,13 +412,14 @@ function LiveSessionFormDialog({
 }: LiveSessionFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [loadingArtists, setLoadingArtists] = useState(false);
 
   const form = useForm<LiveSessionFormValues>({
     resolver: zodResolver(liveSessionSchema),
     defaultValues: {
       title: "",
       artist: "",
-      sessionNumber: "",
       liveTime: "",
       cover: "",
       description: "",
@@ -434,13 +427,35 @@ function LiveSessionFormDialog({
     },
   });
 
+  // 加载歌手列表
+  const loadArtists = useCallback(async () => {
+    setLoadingArtists(true);
+    try {
+      const res = await request<PageResult<Artist>>({
+        method: "GET",
+        url: "/admin/artists",
+        params: { pageSize: 200 },
+      });
+      setArtists(res.list ?? []);
+    } catch {
+      // 静默失败，不影响表单使用
+    } finally {
+      setLoadingArtists(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      void loadArtists();
+    }
+  }, [open, loadArtists]);
+
   useEffect(() => {
     if (!open) return;
     if (editing) {
       form.reset({
         title: editing.title,
         artist: editing.artist || "",
-        sessionNumber: editing.sessionNumber != null ? String(editing.sessionNumber) : "",
         liveTime: editing.liveTime?.slice(0, 16) || "",
         cover: editing.cover || "",
         description: editing.description || "",
@@ -450,7 +465,6 @@ function LiveSessionFormDialog({
       form.reset({
         title: "",
         artist: "",
-        sessionNumber: "",
         liveTime: new Date().toISOString().slice(0, 16),
         cover: "",
         description: "",
@@ -462,12 +476,14 @@ function LiveSessionFormDialog({
   async function onSubmit(values: LiveSessionFormValues) {
     setSubmitting(true);
     try {
+      // 将 datetime-local 格式转换为完整的 ISO-8601 格式
+      const liveTimeISO = values.liveTime.includes(":00")
+        ? values.liveTime
+        : `${values.liveTime}:00`;
+
       const payload = {
         ...values,
-        sessionNumber:
-          values.sessionNumber && values.sessionNumber !== ""
-            ? Number(values.sessionNumber)
-            : undefined,
+        liveTime: liveTimeISO,
       };
       if (editing) {
         await request({
@@ -529,27 +545,28 @@ function LiveSessionFormDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>歌手</FormLabel>
-                  <FormControl>
-                    <Input placeholder="请输入歌手名称" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sessionNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>场次编号</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="如 1, 2, 3..."
-                      {...field}
-                    />
-                  </FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={loadingArtists}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            loadingArtists ? "加载歌手列表..." : "请选择歌手"
+                          }
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {artists.map((artist) => (
+                        <SelectItem key={artist.id} value={artist.name}>
+                          {artist.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
