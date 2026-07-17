@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -139,23 +139,27 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   }, []);
 
   // 根据角色过滤菜单组
-  const filteredGroups = MENU_GROUPS.filter((group) => {
-    if (!group.roles || group.roles.length === 0) return true;
-    return group.roles.includes(userRole);
-  });
+  const filteredGroups = useMemo(() => {
+    return MENU_GROUPS.filter((group) => {
+      if (!group.roles || group.roles.length === 0) return true;
+      return group.roles.includes(userRole);
+    });
+  }, [userRole]);
 
   // 初始化时展开包含激活项的分组
   useEffect(() => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      filteredGroups.forEach((group) => {
-        if (hasActiveChild(group, pathname)) {
-          next.add(group.label);
+      MENU_GROUPS.forEach((group) => {
+        if (!group.roles || group.roles.includes(userRole)) {
+          if (hasActiveChild(group, pathname)) {
+            next.add(group.label);
+          }
         }
       });
       return next;
     });
-  }, [pathname, filteredGroups]);
+  }, [pathname, userRole]);
 
   // 切换分组展开状态
   const toggleGroup = useCallback((groupLabel: string) => {
