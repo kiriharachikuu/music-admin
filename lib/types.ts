@@ -24,7 +24,7 @@ export interface UploadResult {
 
 // ============ 业务实体类型（与 Prisma schema 对齐） ============
 
-export type Role = "USER" | "ADMIN";
+export type Role = "USER" | "ADMIN" | "EDITOR";
 export type SongStatus = "PUBLISHED" | "DRAFT";
 export type BannerStatus = "VISIBLE" | "HIDDEN";
 

@@ -61,6 +61,8 @@ interface MenuGroup {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   children: MenuItem[];
+  /** 允许访问的角色，默认仅 ADMIN */
+  roles?: string[];
 }
 
 // 检查菜单组中是否有激活项
@@ -72,6 +74,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "概览",
     icon: LayoutDashboard,
+    roles: ["ADMIN"],
     children: [
       { label: "数据看板", href: "/dashboard", icon: LayoutDashboard, exact: true },
     ],
@@ -79,6 +82,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "内容管理",
     icon: Folder,
+    roles: ["ADMIN", "EDITOR"],
     children: [
       { label: "歌曲管理", href: "/dashboard/songs", icon: Music },
       { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
@@ -89,6 +93,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "直播相关",
     icon: Video,
+    roles: ["ADMIN", "EDITOR"],
     children: [
       { label: "直播场次", href: "/dashboard/live-sessions", icon: Radio },
       { label: "直播歌切", href: "/dashboard/live-clips", icon: Music2 },
@@ -97,6 +102,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "运营管理",
     icon: BarChart3,
+    roles: ["ADMIN"],
     children: [
       { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
       { label: "用户管理", href: "/dashboard/users", icon: Users },
@@ -106,6 +112,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "系统管理",
     icon: Wrench,
+    roles: ["ADMIN"],
     children: [
       { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
       { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
@@ -124,19 +131,31 @@ function isActive(item: MenuItem, pathname: string) {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [userRole, setUserRole] = useState<string>("USER");
+
+  useEffect(() => {
+    const user = getUser();
+    setUserRole(user?.role || "USER");
+  }, []);
+
+  // 根据角色过滤菜单组
+  const filteredGroups = MENU_GROUPS.filter((group) => {
+    if (!group.roles || group.roles.length === 0) return true;
+    return group.roles.includes(userRole);
+  });
 
   // 初始化时展开包含激活项的分组
   useEffect(() => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      MENU_GROUPS.forEach((group) => {
+      filteredGroups.forEach((group) => {
         if (hasActiveChild(group, pathname)) {
           next.add(group.label);
         }
       });
       return next;
     });
-  }, [pathname]);
+  }, [pathname, filteredGroups]);
 
   // 切换分组展开状态
   const toggleGroup = useCallback((groupLabel: string) => {
@@ -168,7 +187,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       {/* 菜单列表 */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {MENU_GROUPS.map((group) => {
+        {filteredGroups.map((group) => {
           const GroupIcon = group.icon;
           const isExpanded = expandedGroups.has(group.label);
           const groupHasActive = hasActiveChild(group, pathname);

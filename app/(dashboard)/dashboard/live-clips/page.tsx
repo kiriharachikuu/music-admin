@@ -10,6 +10,10 @@ import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
 import type { LiveClip, LiveSession, PageResult, SongStatus } from "@/lib/types";
 import { formatDuration, useDebounced } from "@/lib/admin-utils";
+import {
+  parseAudioMetadata,
+  type AudioMetadata,
+} from "@/lib/parse-audio-metadata";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
@@ -453,6 +457,9 @@ function LiveClipFormDialog({
 }: LiveClipFormDialogProps) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [parsedMetadata, setParsedMetadata] = useState<AudioMetadata | null>(null);
 
   const form = useForm<LiveClipFormValues>({
     resolver: zodResolver(liveClipSchema),
@@ -472,6 +479,9 @@ function LiveClipFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    setParsing(false);
+    setParseWarnings([]);
+    setParsedMetadata(null);
     if (editing) {
       form.reset({
         title: editing.title,
@@ -502,6 +512,43 @@ function LiveClipFormDialog({
   }, [open, editing, form]);
 
   const durationValue = form.watch("duration");
+
+  // 音频文件选中回调：解析 ID3 元信息并自动填充表单
+  async function handleAudioFileSelected(file: File) {
+    setParsing(true);
+    setParseWarnings([]);
+    setParsedMetadata(null);
+    try {
+      const { metadata, warnings } = await parseAudioMetadata(file);
+      setParsedMetadata(metadata);
+      setParseWarnings(warnings);
+      // 自动填充：标题、歌手、时长、封面
+      if (metadata.title) form.setValue("title", metadata.title);
+      if (metadata.artist) form.setValue("artist", metadata.artist);
+      if (metadata.duration && metadata.duration > 0) {
+        form.setValue("duration", metadata.duration);
+      }
+      if (metadata.pictureUrl) {
+        form.setValue("coverUrl", metadata.pictureUrl);
+      }
+      if (warnings.length === 0) {
+        toast({ title: "元信息读取成功" });
+      } else {
+        toast({
+          title: "元信息已读取",
+          description: "部分字段缺失，请核对并手动补充",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "元信息读取失败",
+        description: err instanceof Error ? err.message : "请手动填写歌切信息",
+        variant: "destructive",
+      });
+    } finally {
+      setParsing(false);
+    }
+  }
 
   async function onSubmit(values: LiveClipFormValues) {
     setSubmitting(true);
@@ -660,16 +707,47 @@ function LiveClipFormDialog({
                     <FileUpload
                       value={field.value}
                       onChange={field.onChange}
+                      onFileSelected={handleAudioFileSelected}
                       type="audio"
                       accept="audio/*"
                       preview="audio"
-                      hint="支持 MP3 / WAV / FLAC 等音频格式"
+                      hint="支持 MP3 / WAV / FLAC 等音频格式，上传后自动读取元信息"
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* 元信息解析状态反馈 */}
+            {parsing && (
+              <div className="flex items-center gap-2 rounded-md border border-primary-500/30 bg-primary-50 p-3 text-sm text-primary-700 dark:bg-primary-900/20">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>正在读取音频元信息…</span>
+              </div>
+            )}
+            {parsedMetadata && !parsing && (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                  <span className="font-medium text-foreground">已读取元信息</span>
+                  {parsedMetadata.bitrate && (
+                    <span>比特率：约 {parsedMetadata.bitrate} kbps</span>
+                  )}
+                  {parsedMetadata.duration && (
+                    <span>时长：{formatDuration(parsedMetadata.duration)}</span>
+                  )}
+                </div>
+                {parseWarnings.length > 0 && (
+                  <ul className="space-y-1">
+                    {parseWarnings.map((w, i) => (
+                      <li key={i} className="text-amber-600 dark:text-amber-400">
+                        ⚠ {w}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
