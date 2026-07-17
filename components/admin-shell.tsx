@@ -127,15 +127,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   // 初始化时展开包含激活项的分组
   useEffect(() => {
-    const groupsToExpand = new Set<string>();
-    MENU_GROUPS.forEach((group) => {
-      if (hasActiveChild(group, pathname)) {
-        groupsToExpand.add(group.label);
-      }
-    });
     setExpandedGroups((prev) => {
-      const merged = new Set([...prev, ...groupsToExpand]);
-      return merged;
+      const next = new Set(prev);
+      MENU_GROUPS.forEach((group) => {
+        if (hasActiveChild(group, pathname)) {
+          next.add(group.label);
+        }
+      });
+      return next;
     });
   }, [pathname]);
 
