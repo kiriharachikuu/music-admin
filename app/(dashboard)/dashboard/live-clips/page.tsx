@@ -440,6 +440,73 @@ export default function LiveClipsPage() {
   );
 }
 
+/** 文件名解析结果 */
+interface FilenameParseResult {
+  title: string;
+  artist: string;
+  date: string;
+}
+
+/** 期望的文件名格式示例 */
+const FILENAME_FORMAT_EXAMPLE = "《兔子先生》-星瞳-2024年03月05日星期二";
+
+/**
+ * 从文件名中解析歌曲信息
+ * 严格格式：《歌曲名称》-歌手名称-日期（YYYY年MM月DD日星期X）
+ * 文件扩展名会被自动去除后再解析
+ */
+function parseFilename(filename: string): { result: FilenameParseResult | null; error?: string } {
+  try {
+    // 去除文件扩展名
+    const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
+    if (!nameWithoutExt) {
+      return { result: null, error: "文件名为空" };
+    }
+
+    // 匹配格式：《歌曲名称》-歌手名称-日期
+    const regex = /^(.+?)-(.+?)-(\d{4}年\d{2}月\d{2}日星期[\u4e00-\u9fff])$/;
+    const match = nameWithoutExt.match(regex);
+
+    if (!match) {
+      return {
+        result: null,
+        error: `文件名不符合格式要求，正确格式示例：${FILENAME_FORMAT_EXAMPLE}`,
+      };
+    }
+
+    const [, rawTitle, artist, date] = match;
+
+    // 提取《》内的歌曲名称
+    const titleMatch = rawTitle.match(/^《(.+)》$/);
+    if (!titleMatch) {
+      return {
+        result: null,
+        error: `歌曲名称须用《》包裹，正确格式示例：${FILENAME_FORMAT_EXAMPLE}`,
+      };
+    }
+
+    const title = titleMatch[1].trim();
+    const trimmedArtist = artist.trim();
+
+    if (!title) {
+      return { result: null, error: "歌曲名称不能为空" };
+    }
+    if (!trimmedArtist) {
+      return { result: null, error: "歌手名称不能为空" };
+    }
+
+    return {
+      result: {
+        title,
+        artist: trimmedArtist,
+        date,
+      },
+    };
+  } catch {
+    return { result: null, error: "文件名解析异常，请手动填写信息" };
+  }
+}
+
 interface LiveClipFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -460,6 +527,8 @@ function LiveClipFormDialog({
   const [parsing, setParsing] = useState(false);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
   const [parsedMetadata, setParsedMetadata] = useState<AudioMetadata | null>(null);
+  const [filenameError, setFilenameError] = useState<string | null>(null);
+  const [parsedDate, setParsedDate] = useState<string | null>(null);
 
   const form = useForm<LiveClipFormValues>({
     resolver: zodResolver(liveClipSchema),
@@ -482,6 +551,8 @@ function LiveClipFormDialog({
     setParsing(false);
     setParseWarnings([]);
     setParsedMetadata(null);
+    setFilenameError(null);
+    setParsedDate(null);
     if (editing) {
       form.reset({
         title: editing.title,
@@ -513,27 +584,53 @@ function LiveClipFormDialog({
 
   const durationValue = form.watch("duration");
 
-  // 音频文件选中回调：解析 ID3 元信息并自动填充表单
+  // 音频文件选中回调：解析 ID3 元信息 + 文件名自动提取，填充表单
   async function handleAudioFileSelected(file: File) {
     setParsing(true);
     setParseWarnings([]);
     setParsedMetadata(null);
+    setFilenameError(null);
+    setParsedDate(null);
+
+    let hasFilenameError = false;
+
+    // 1. 文件名解析：提取歌曲名称、歌手、日期
+    try {
+      const { result: filenameResult, error: filenameErr } = parseFilename(file.name);
+      if (filenameResult) {
+        form.setValue("title", filenameResult.title);
+        form.setValue("artist", filenameResult.artist);
+        setParsedDate(filenameResult.date);
+      } else if (filenameErr) {
+        hasFilenameError = true;
+        setFilenameError(filenameErr);
+      }
+    } catch {
+      hasFilenameError = true;
+      setFilenameError("文件名解析异常，请手动填写信息");
+    }
+
+    // 2. ID3 元信息解析（补充或覆盖文件名解析结果）
     try {
       const { metadata, warnings } = await parseAudioMetadata(file);
       setParsedMetadata(metadata);
       setParseWarnings(warnings);
-      // 自动填充：标题、歌手、时长、封面
-      if (metadata.title) form.setValue("title", metadata.title);
-      if (metadata.artist) form.setValue("artist", metadata.artist);
+      // ID3 元信息仅在文件名未解析成功时覆盖对应字段
+      if (metadata.title && !form.getValues("title")) {
+        form.setValue("title", metadata.title);
+      }
+      if (metadata.artist && !form.getValues("artist")) {
+        form.setValue("artist", metadata.artist);
+      }
       if (metadata.duration && metadata.duration > 0) {
         form.setValue("duration", metadata.duration);
       }
       if (metadata.pictureUrl) {
         form.setValue("coverUrl", metadata.pictureUrl);
       }
-      if (warnings.length === 0) {
-        toast({ title: "元信息读取成功" });
-      } else {
+      if (warnings.length === 0 && !hasFilenameError) {
+        toast({ title: "信息解析成功" });
+      } else if (warnings.length > 0) {
         toast({
           title: "元信息已读取",
           description: "部分字段缺失，请核对并手动补充",
@@ -711,7 +808,7 @@ function LiveClipFormDialog({
                       type="audio"
                       accept="audio/*"
                       preview="audio"
-                      hint="支持 MP3 / WAV / FLAC 等音频格式，上传后自动读取元信息"
+                      hint="支持 MP3 / WAV / FLAC 等音频格式，文件名格式：《歌曲名称》-歌手-日期"
                     />
                   </FormControl>
                   <FormMessage />
@@ -747,6 +844,27 @@ function LiveClipFormDialog({
                   </ul>
                 )}
               </div>
+            )}
+
+            {/* 文件名解析反馈 */}
+            {filenameError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <p className="font-medium">文件名解析失败</p>
+                <p className="mt-1 text-xs">{filenameError}</p>
+              </div>
+            )}
+
+            {/* 解析出的日期信息 */}
+            {parsedDate && (
+              <FormItem>
+                <FormLabel>上传日期（从文件名解析）</FormLabel>
+                <FormControl>
+                  <Input value={parsedDate} readOnly className="bg-muted/50" />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  此信息从文件名自动提取，仅供参考
+                </p>
+              </FormItem>
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
