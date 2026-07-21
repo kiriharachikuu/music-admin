@@ -8,7 +8,7 @@ import { Loader2, Pencil, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
-import type { LiveClip, LiveSession, PageResult, SongStatus } from "@/lib/types";
+import type { Artist, LiveClip, LiveSession, PageResult, SongStatus } from "@/lib/types";
 import { formatDuration, useDebounced } from "@/lib/admin-utils";
 import {
   parseAudioMetadata,
@@ -77,6 +77,7 @@ export default function LiveClipsPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
   const [sessions, setSessions] = useState<LiveSession[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<LiveClip | null>(null);
@@ -127,6 +128,19 @@ export default function LiveClipsPage() {
     }
   }, []);
 
+  const loadArtists = useCallback(async () => {
+    try {
+      const res = await request<PageResult<Artist>>({
+        method: "GET",
+        url: "/admin/artists",
+        params: { page: 1, pageSize: 200 },
+      });
+      setArtists(res.list ?? []);
+    } catch {
+      // 选项加载失败不阻塞主流程
+    }
+  }, []);
+
   useEffect(() => {
     void loadList();
   }, [loadList]);
@@ -134,6 +148,10 @@ export default function LiveClipsPage() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => {
+    void loadArtists();
+  }, [loadArtists]);
 
   useEffect(() => {
     setPage(1);
@@ -396,6 +414,9 @@ export default function LiveClipsPage() {
         }}
         editing={editing}
         sessions={sessions}
+        artists={artists}
+        onSessionsChange={setSessions}
+        onArtistsChange={setArtists}
         onSuccess={() => {
           setFormOpen(false);
           setEditing(null);
@@ -444,62 +465,89 @@ export default function LiveClipsPage() {
 interface FilenameParseResult {
   title: string;
   artist: string;
-  date: string;
+  date: string; // YYYY-MM-DD 格式
 }
 
 /** 期望的文件名格式示例 */
-const FILENAME_FORMAT_EXAMPLE = "《兔子先生》-星瞳-2024年03月05日星期二";
+const FILENAME_FORMAT_EXAMPLE = "小星星-星瞳-2026-7-21";
+
+/**
+ * 校验并归一化日期（YYYY-M-D 或 YYYY-MM-DD → YYYY-MM-DD）
+ */
+function normalizeDate(raw: string): string | null {
+  const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const month = m.padStart(2, "0");
+  const day = d.padStart(2, "0");
+  // 校验合法日期
+  const date = new Date(`${y}-${month}-${day}`);
+  if (isNaN(date.getTime())) return null;
+  return `${y}-${month}-${day}`;
+}
 
 /**
  * 从文件名中解析歌曲信息
- * 严格格式：《歌曲名称》-歌手名称-日期（YYYY年MM月DD日星期X）
- * 文件扩展名会被自动去除后再解析
+ * 规则：歌名-歌手-日期，按 - 分割后从右向左识别
+ * 1. 最右段为日期（YYYY-M-D 或 YYYY-MM-DD）
+ * 2. 剩余段中查找含"星瞳"的段作为歌手（多段用 ＆ 合并）
+ * 3. 去除日期和歌手段后，剩余左侧段用 - 连接作为歌名
  */
 function parseFilename(filename: string): { result: FilenameParseResult | null; error?: string } {
   try {
-    // 去除文件扩展名
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     if (!nameWithoutExt) {
       return { result: null, error: "文件名为空" };
     }
 
-    // 匹配格式：《歌曲名称》-歌手名称-日期
-    const regex = /^(.+?)-(.+?)-(\d{4}年\d{2}月\d{2}日星期[\u4e00-\u9fff])$/;
-    const match = nameWithoutExt.match(regex);
-
-    if (!match) {
+    if (!nameWithoutExt.includes("-")) {
       return {
         result: null,
-        error: `文件名不符合格式要求，正确格式示例：${FILENAME_FORMAT_EXAMPLE}`,
+        error: "文件名格式不符合规范（歌名-歌手-日期），请手动填写",
       };
     }
 
-    const [, rawTitle, artist, date] = match;
-
-    // 提取《》内的歌曲名称
-    const titleMatch = rawTitle.match(/^《(.+)》$/);
-    if (!titleMatch) {
+    const segments = nameWithoutExt.split("-");
+    if (segments.length < 3) {
       return {
         result: null,
-        error: `歌曲名称须用《》包裹，正确格式示例：${FILENAME_FORMAT_EXAMPLE}`,
+        error: "文件名信息不完整，请检查格式（歌名-歌手-日期）",
       };
     }
 
-    const title = titleMatch[1].trim();
-    const trimmedArtist = artist.trim();
+    // 从右向左：最右段为日期
+    const rawDate = segments[segments.length - 1];
+    const normalizedDate = normalizeDate(rawDate);
+    if (!normalizedDate) {
+      return {
+        result: null,
+        error: `文件名末尾未识别到日期（示例：2026-7-21），请手动填写`,
+      };
+    }
 
-    if (!title) {
+    // 剩余段中查找含"星瞳"的段作为歌手
+    const remaining = segments.slice(0, -1);
+    const artistSegments = remaining.filter((s) => s.includes("星瞳"));
+    if (artistSegments.length === 0) {
+      return {
+        result: null,
+        error: "文件名未识别到歌手信息（星瞳），请手动填写",
+      };
+    }
+    const artist = artistSegments.join("＆");
+
+    // 去除歌手段后，剩余左侧段用 - 连接作为歌名
+    const titleSegments = remaining.filter((s) => !s.includes("星瞳"));
+    if (titleSegments.length === 0) {
       return { result: null, error: "歌曲名称不能为空" };
     }
-    if (!trimmedArtist) {
-      return { result: null, error: "歌手名称不能为空" };
-    }
+    const title = titleSegments.join("-");
 
     return {
       result: {
         title,
-        artist: trimmedArtist,
-        date,
+        artist,
+        date: normalizedDate,
       },
     };
   } catch {
@@ -512,6 +560,9 @@ interface LiveClipFormDialogProps {
   onOpenChange: (open: boolean) => void;
   editing: LiveClip | null;
   sessions: LiveSession[];
+  artists: Artist[];
+  onSessionsChange: (sessions: LiveSession[]) => void;
+  onArtistsChange: (artists: Artist[]) => void;
   onSuccess: () => void;
 }
 
@@ -520,6 +571,9 @@ function LiveClipFormDialog({
   onOpenChange,
   editing,
   sessions,
+  artists,
+  onSessionsChange,
+  onArtistsChange,
   onSuccess,
 }: LiveClipFormDialogProps) {
   const { toast } = useToast();
@@ -529,6 +583,8 @@ function LiveClipFormDialog({
   const [parsedMetadata, setParsedMetadata] = useState<AudioMetadata | null>(null);
   const [filenameError, setFilenameError] = useState<string | null>(null);
   const [parsedDate, setParsedDate] = useState<string | null>(null);
+  const [sessionMatchInfo, setSessionMatchInfo] = useState<string | null>(null);
+  const [artistProcessInfo, setArtistProcessInfo] = useState<string | null>(null);
 
   const form = useForm<LiveClipFormValues>({
     resolver: zodResolver(liveClipSchema),
@@ -553,6 +609,8 @@ function LiveClipFormDialog({
     setParsedMetadata(null);
     setFilenameError(null);
     setParsedDate(null);
+    setSessionMatchInfo(null);
+    setArtistProcessInfo(null);
     if (editing) {
       form.reset({
         title: editing.title,
@@ -591,16 +649,20 @@ function LiveClipFormDialog({
     setParsedMetadata(null);
     setFilenameError(null);
     setParsedDate(null);
+    setSessionMatchInfo(null);
+    setArtistProcessInfo(null);
 
     let hasFilenameError = false;
 
     // 1. 文件名解析：提取歌曲名称、歌手、日期
+    let filenameResult: FilenameParseResult | null = null;
     try {
-      const { result: filenameResult, error: filenameErr } = parseFilename(file.name);
-      if (filenameResult) {
-        form.setValue("title", filenameResult.title);
-        form.setValue("artist", filenameResult.artist);
-        setParsedDate(filenameResult.date);
+      const { result, error: filenameErr } = parseFilename(file.name);
+      if (result) {
+        filenameResult = result;
+        form.setValue("title", result.title);
+        form.setValue("artist", result.artist);
+        setParsedDate(result.date);
       } else if (filenameErr) {
         hasFilenameError = true;
         setFilenameError(filenameErr);
@@ -608,6 +670,103 @@ function LiveClipFormDialog({
     } catch {
       hasFilenameError = true;
       setFilenameError("文件名解析异常，请手动填写信息");
+    }
+
+    // 1a. 文件名解析成功后：场次匹配 + 合集自动创建 + 歌手自动处理
+    if (filenameResult) {
+      // 场次匹配
+      const matchedSession = sessions.find(
+        (s) => {
+          const sessionDate = s.liveTime?.slice(0, 10);
+          return sessionDate === filenameResult!.date;
+        }
+      );
+
+      if (matchedSession) {
+        form.setValue("sessionId", matchedSession.id);
+        setSessionMatchInfo(`已匹配场次：${matchedSession.title}`);
+      } else {
+        // 无匹配场次 → 自动创建合集
+        try {
+          const newSession = await request<LiveSession>({
+            method: "POST",
+            url: "/admin/live-sessions",
+            data: {
+              title: `${filenameResult.date} 直播歌曲合集`,
+              artist: filenameResult.artist,
+              liveTime: `${filenameResult.date}T20:00:00.000Z`,
+              status: "DRAFT",
+            },
+          });
+          onSessionsChange([newSession, ...sessions]);
+          form.setValue("sessionId", newSession.id);
+          setSessionMatchInfo(`已自动创建场次：${newSession.title}`);
+          toast({ title: `已自动创建场次：${newSession.title}` });
+        } catch {
+          setSessionMatchInfo("场次创建失败，请手动选择");
+          toast({
+            title: "场次创建失败",
+            description: "请手动选择或创建场次",
+            variant: "destructive",
+          });
+        }
+      }
+
+      // 歌手自动处理：按 ＆ 拆分，匹配已有/创建新歌手
+      const artistNames = filenameResult.artist.split("＆");
+      const existingNames: string[] = [];
+      const newNames: string[] = [];
+
+      for (const name of artistNames) {
+        const trimmed = name.trim();
+        if (!trimmed) continue;
+        if (artists.some((a) => a.name === trimmed)) {
+          existingNames.push(trimmed);
+        } else {
+          newNames.push(trimmed);
+        }
+      }
+
+      // 创建不存在的歌手
+      const createdArtists: Artist[] = [];
+      for (const name of newNames) {
+        try {
+          const newArtist = await request<Artist>({
+            method: "POST",
+            url: "/admin/artists",
+            data: { name },
+          });
+          createdArtists.push(newArtist);
+          toast({ title: `已自动创建歌手：${name}` });
+        } catch {
+          toast({
+            title: `歌手创建失败：${name}`,
+            variant: "destructive",
+          });
+        }
+      }
+
+      if (createdArtists.length > 0) {
+        onArtistsChange([...createdArtists, ...artists]);
+      }
+
+      // 汇总歌手处理信息
+      const parts: string[] = [];
+      if (existingNames.length > 0) {
+        parts.push(`${existingNames.join("、")}（已有）`);
+      }
+      if (createdArtists.length > 0) {
+        parts.push(`${createdArtists.map((a) => a.name).join("、")}（新建）`);
+      }
+      if (newNames.length > createdArtists.length) {
+        const failed = newNames.filter(
+          (n) => !createdArtists.some((a) => a.name === n)
+        );
+        parts.push(`${failed.join("、")}（创建失败）`);
+      }
+      if (parts.length > 0) {
+        setArtistProcessInfo(`歌手：${parts.join("、")}`);
+      }
     }
 
     // 2. ID3 元信息解析（补充或覆盖文件名解析结果）
@@ -808,7 +967,7 @@ function LiveClipFormDialog({
                       type="audio"
                       accept="audio/*"
                       preview="audio"
-                      hint="支持 MP3 / WAV / FLAC 等音频格式，文件名格式：《歌曲名称》-歌手-日期"
+                      hint="文件名格式：歌名-歌手-日期（如 小星星-星瞳-2026-7-21），自动识别并创建合集"
                     />
                   </FormControl>
                   <FormMessage />
@@ -854,17 +1013,30 @@ function LiveClipFormDialog({
               </div>
             )}
 
-            {/* 解析出的日期信息 */}
+            {/* 解析出的日期与合集信息 */}
             {parsedDate && (
-              <FormItem>
-                <FormLabel>上传日期（从文件名解析）</FormLabel>
-                <FormControl>
-                  <Input value={parsedDate} readOnly className="bg-muted/50" />
-                </FormControl>
-                <p className="text-xs text-muted-foreground">
-                  此信息从文件名自动提取，仅供参考
-                </p>
-              </FormItem>
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">演唱日期</span>
+                  <span className="text-muted-foreground">{parsedDate}</span>
+                </div>
+                {sessionMatchInfo && (
+                  <div
+                    className={
+                      sessionMatchInfo.includes("失败")
+                        ? "text-destructive"
+                        : sessionMatchInfo.includes("自动创建")
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {sessionMatchInfo}
+                  </div>
+                )}
+                {artistProcessInfo && (
+                  <div className="text-muted-foreground">{artistProcessInfo}</div>
+                )}
+              </div>
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
