@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Shield, ShieldOff, Pencil, Users, UserCheck, UserX } from "lucide-react";
+import { Pencil, Users, UserCheck, UserX, UserCog } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
@@ -25,6 +25,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -45,7 +53,7 @@ export default function UsersPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [roleTarget, setRoleTarget] = useState<User | null>(null);
+  const [roleTarget, setRoleTarget] = useState<{ user: User; role: Role } | null>(null);
   const [toggleTarget, setToggleTarget] = useState<User | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -117,16 +125,15 @@ export default function UsersPage() {
 
   async function handleRoleChange() {
     if (!roleTarget) return;
-    const next: Role = roleTarget.role === "ADMIN" ? "USER" : "ADMIN";
+    const { user, role } = roleTarget;
     try {
       await request({
         method: "PUT",
-        url: `/admin/users/${roleTarget.id}/role`,
-        data: { role: next },
+        url: `/admin/users/${user.id}/role`,
+        data: { role },
       });
-      toast({
-        title: next === "ADMIN" ? "已设为管理员" : "已取消管理员",
-      });
+      const label = role === "ADMIN" ? "管理员" : role === "EDITOR" ? "编辑" : "普通用户";
+      toast({ title: `已设为${label}` });
       setRoleTarget(null);
       void loadList();
     } catch (err) {
@@ -181,9 +188,8 @@ export default function UsersPage() {
         url: "/admin/users/batch/role",
         data: { ids: selectedRowKeys, role: batchRoleTarget },
       });
-      toast({
-        title: batchRoleTarget === "ADMIN" ? "已批量设为管理员" : "已批量取消管理员",
-      });
+      const label = batchRoleTarget === "ADMIN" ? "管理员" : batchRoleTarget === "EDITOR" ? "编辑" : "普通用户";
+      toast({ title: `已批量设为${label}` });
       setBatchRoleTarget(null);
       setSelectedRowKeys([]);
       void loadList();
@@ -240,6 +246,8 @@ export default function UsersPage() {
       render: (row) =>
         row.role === "ADMIN" ? (
           <Badge className="bg-primary-700 hover:bg-primary-700">管理员</Badge>
+        ) : row.role === "EDITOR" ? (
+          <Badge className="bg-amber-600 hover:bg-amber-600">编辑</Badge>
         ) : (
           <Badge variant="secondary">普通用户</Badge>
         ),
@@ -312,28 +320,47 @@ export default function UsersPage() {
             <Pencil className="h-3.5 w-3.5" />
             编辑
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={
-              row.role === "ADMIN"
-                ? "h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                : "h-8"
-            }
-            onClick={() => setRoleTarget(row)}
-          >
-            {row.role === "ADMIN" ? (
-              <>
-                <ShieldOff className="h-3.5 w-3.5" />
-                取消管理员
-              </>
-            ) : (
-              <>
-                <Shield className="h-3.5 w-3.5" />
-                设为管理员
-              </>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={
+                  row.role === "ADMIN"
+                    ? "h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    : "h-8"
+                }
+              >
+                <UserCog className="h-3.5 w-3.5" />
+                角色
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>设置角色</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className={row.role === "USER" ? "font-semibold" : ""}
+                onClick={() => setRoleTarget({ user: row, role: "USER" })}
+                disabled={row.role === "USER"}
+              >
+                普通用户
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={row.role === "EDITOR" ? "font-semibold" : ""}
+                onClick={() => setRoleTarget({ user: row, role: "EDITOR" })}
+                disabled={row.role === "EDITOR"}
+              >
+                编辑
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={row.role === "ADMIN" ? "font-semibold" : ""}
+                onClick={() => setRoleTarget({ user: row, role: "ADMIN" })}
+                disabled={row.role === "ADMIN"}
+              >
+                管理员
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ),
     },
@@ -374,10 +401,18 @@ export default function UsersPage() {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setBatchRoleTarget("EDITOR")}
+            >
+              <UserCog className="h-3.5 w-3.5" />
+              批量设为编辑
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => setBatchRoleTarget("USER")}
             >
               <UserCheck className="h-3.5 w-3.5" />
-              批量取消管理员
+              批量设为普通用户
             </Button>
             <Button
               size="sm"
@@ -402,16 +437,18 @@ export default function UsersPage() {
       <ConfirmDialog
         open={!!roleTarget}
         onOpenChange={(o) => !o && setRoleTarget(null)}
-        title={roleTarget?.role === "ADMIN" ? "取消管理员" : "设为管理员"}
+        title={roleTarget ? `设为${roleTarget.role === "ADMIN" ? "管理员" : roleTarget.role === "EDITOR" ? "编辑" : "普通用户"}` : ""}
         description={
           roleTarget
             ? roleTarget.role === "ADMIN"
-              ? `确定要取消用户「${roleTarget.username}」的管理员权限吗？取消后将变为普通用户。`
-              : `确定要将用户「${roleTarget.username}」设为管理员吗？管理员拥有后台所有操作权限，请谨慎操作。`
+              ? `确定要将用户「${roleTarget.user.username}」设为管理员吗？管理员拥有后台所有操作权限，请谨慎操作。`
+              : roleTarget.role === "EDITOR"
+                ? `确定要将用户「${roleTarget.user.username}」设为编辑吗？编辑可管理歌曲、专辑、歌单、歌手和直播内容，但无法管理用户、Banner 和系统设置。`
+                : `确定要将用户「${roleTarget.user.username}」设为普通用户吗？将失去所有后台管理权限。`
             : ""
         }
-        confirmText={roleTarget?.role === "ADMIN" ? "取消管理员" : "设为管理员"}
-        variant={roleTarget?.role === "ADMIN" ? "destructive" : "default"}
+        confirmText={roleTarget ? `设为${roleTarget.role === "ADMIN" ? "管理员" : roleTarget.role === "EDITOR" ? "编辑" : "普通用户"}` : ""}
+        variant={roleTarget?.role === "USER" && roleTarget.user.role !== "USER" ? "destructive" : "default"}
         onConfirm={handleRoleChange}
       />
 
@@ -486,6 +523,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USER">普通用户</SelectItem>
+                  <SelectItem value="EDITOR">编辑</SelectItem>
                   <SelectItem value="ADMIN">管理员</SelectItem>
                 </SelectContent>
               </Select>
@@ -512,10 +550,10 @@ export default function UsersPage() {
       <ConfirmDialog
         open={batchRoleTarget !== null}
         onOpenChange={(o) => !o && setBatchRoleTarget(null)}
-        title={batchRoleTarget === "ADMIN" ? "批量设为管理员" : "批量取消管理员"}
-        description={`确定要将选中的 ${selectedRowKeys.length} 个用户${batchRoleTarget === "ADMIN" ? "设为管理员" : "取消管理员"}吗？`}
-        confirmText={batchRoleTarget === "ADMIN" ? "批量设为管理员" : "批量取消管理员"}
-        variant={batchRoleTarget === "ADMIN" ? "default" : "destructive"}
+        title={batchRoleTarget ? `批量设为${batchRoleTarget === "ADMIN" ? "管理员" : batchRoleTarget === "EDITOR" ? "编辑" : "普通用户"}` : ""}
+        description={`确定要将选中的 ${selectedRowKeys.length} 个用户${batchRoleTarget === "ADMIN" ? "设为管理员" : batchRoleTarget === "EDITOR" ? "设为编辑" : "设为普通用户"}吗？`}
+        confirmText={batchRoleTarget ? `批量设为${batchRoleTarget === "ADMIN" ? "管理员" : batchRoleTarget === "EDITOR" ? "编辑" : "普通用户"}` : ""}
+        variant={batchRoleTarget === "USER" ? "destructive" : "default"}
         onConfirm={handleBatchRoleChange}
       />
 

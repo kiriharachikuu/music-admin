@@ -71,7 +71,13 @@ export function ArtistSelector({
     }
   }, [open, loadArtists]);
 
-  const selectedArtists = list.filter((a) => selectedIds.includes(a.id));
+  // 已选歌手预览：合并当前列表和初始列表中的已选项，确保分页/搜索后已选项仍可见
+  const selectedArtists = [
+    ...list.filter((a) => selectedIds.includes(a.id)),
+    ...initialArtists.filter(
+      (a) => selectedIds.includes(a.id) && !list.some((l) => l.id === a.id)
+    ),
+  ];
 
   function toggleSelect(id: string) {
     if (selectedIds.includes(id)) {

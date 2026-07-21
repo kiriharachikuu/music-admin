@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { FileUpload } from "@/components/admin/file-upload";
+import { ArtistSelector } from "../artists/artist-selector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -585,6 +586,7 @@ function LiveClipFormDialog({
   const [parsedDate, setParsedDate] = useState<string | null>(null);
   const [sessionMatchInfo, setSessionMatchInfo] = useState<string | null>(null);
   const [artistProcessInfo, setArtistProcessInfo] = useState<string | null>(null);
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
 
   const form = useForm<LiveClipFormValues>({
     resolver: zodResolver(liveClipSchema),
@@ -624,6 +626,12 @@ function LiveClipFormDialog({
         lyricContent: "",
         status: editing.status,
       });
+      // 从 artist 文本字段反查已选歌手 ID（按 ＆ 拆分匹配）
+      const names = editing.artist.split("＆").map((s) => s.trim());
+      const matchedIds = artists
+        .filter((a) => names.includes(a.name))
+        .map((a) => a.id);
+      setSelectedArtistIds(matchedIds);
     } else {
       form.reset({
         title: "",
@@ -637,10 +645,21 @@ function LiveClipFormDialog({
         lyricContent: "",
         status: "DRAFT",
       });
+      setSelectedArtistIds([]);
     }
-  }, [open, editing, form]);
+  }, [open, editing, form, artists]);
 
   const durationValue = form.watch("duration");
+
+  // 歌手选择变化时，同步更新 artist 文本字段（用 ＆ 连接歌手名）
+  // 使用回调而非 useEffect，避免编辑回显时清空未匹配的 artist 文本
+  function handleArtistSelectedChange(ids: string[]) {
+    setSelectedArtistIds(ids);
+    const selectedNames = ids
+      .map((id) => artists.find((a) => a.id === id)?.name)
+      .filter(Boolean) as string[];
+    form.setValue("artist", selectedNames.join("＆"));
+  }
 
   // 音频文件选中回调：解析 ID3 元信息 + 文件名自动提取，填充表单
   async function handleAudioFileSelected(file: File) {
@@ -663,6 +682,12 @@ function LiveClipFormDialog({
         form.setValue("title", result.title);
         form.setValue("artist", result.artist);
         setParsedDate(result.date);
+        // 从文件名解析的歌手文本反查歌手 ID，自动勾选
+        const parsedNames = result.artist.split("＆").map((s) => s.trim());
+        const matchedIds = artists
+          .filter((a) => parsedNames.includes(a.name))
+          .map((a) => a.id);
+        setSelectedArtistIds(matchedIds);
       } else if (filenameErr) {
         hasFilenameError = true;
         setFilenameError(filenameErr);
@@ -862,19 +887,21 @@ function LiveClipFormDialog({
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="artist"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>歌手</FormLabel>
-                    <FormControl>
-                      <Input placeholder="请输入歌手名称" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              {/* 歌手选择：从手动输入升级为歌手库勾选模式 */}
+              <div className="space-y-2">
+                <ArtistSelector
+                  selectedIds={selectedArtistIds}
+                  onSelectedChange={handleArtistSelectedChange}
+                  artists={artists}
+                />
+                {/* 隐藏的 artist 文本字段，保持表单数据兼容 */}
+                <input type="hidden" {...form.register("artist")} />
+                {form.formState.errors.artist && (
+                  <p className="text-sm font-medium text-destructive">
+                    {form.formState.errors.artist.message}
+                  </p>
                 )}
-              />
+              </div>
               <FormField
                 control={form.control}
                 name="sessionId"
