@@ -470,7 +470,7 @@ interface FilenameParseResult {
 }
 
 /** 期望的文件名格式示例 */
-const FILENAME_FORMAT_EXAMPLE = "小星星-星瞳-2026-7-21";
+const FILENAME_FORMAT_EXAMPLE = "下个路口见-星瞳-2023-08-11";
 
 /**
  * 校验并归一化日期（YYYY-M-D 或 YYYY-MM-DD → YYYY-MM-DD）
@@ -489,10 +489,11 @@ function normalizeDate(raw: string): string | null {
 
 /**
  * 从文件名中解析歌曲信息
- * 规则：歌名-歌手-日期，按 - 分割后从右向左识别
- * 1. 最右段为日期（YYYY-M-D 或 YYYY-MM-DD）
- * 2. 剩余段中查找含"星瞳"的段作为歌手（多段用 ＆ 合并）
- * 3. 去除日期和歌手段后，剩余左侧段用 - 连接作为歌名
+ * 规则：歌名-歌手-日期，日期格式为 YYYY-MM-DD 或 YYYY-M-D
+ * 日期中的 - 不会被误当作分隔符
+ * 1. 先用正则从末尾匹配完整日期
+ * 2. 剩余部分按 - 分割，查找含"星瞳"的段作为歌手（多段用 ＆ 合并）
+ * 3. 去除歌手段后，剩余左侧段用 - 连接作为歌名
  */
 function parseFilename(filename: string): { result: FilenameParseResult | null; error?: string } {
   try {
@@ -501,34 +502,41 @@ function parseFilename(filename: string): { result: FilenameParseResult | null; 
       return { result: null, error: "文件名为空" };
     }
 
-    if (!nameWithoutExt.includes("-")) {
+    // 从末尾匹配日期（支持 YYYY-MM-DD 或 YYYY-M-D）
+    const dateMatch = nameWithoutExt.match(/-(\d{4}-\d{1,2}-\d{1,2})$/);
+    if (!dateMatch) {
+      return {
+        result: null,
+        error: `文件名末尾未识别到日期（示例：2023-08-11），请手动填写`,
+      };
+    }
+    const normalizedDate = normalizeDate(dateMatch[1]);
+    if (!normalizedDate) {
+      return {
+        result: null,
+        error: `文件名末尾未识别到日期（示例：2023-08-11），请手动填写`,
+      };
+    }
+
+    // 去除日期部分后剩余的字符串
+    const remainingStr = nameWithoutExt.slice(0, nameWithoutExt.length - dateMatch[0].length);
+    if (!remainingStr || !remainingStr.includes("-")) {
       return {
         result: null,
         error: "文件名格式不符合规范（歌名-歌手-日期），请手动填写",
       };
     }
 
-    const segments = nameWithoutExt.split("-");
-    if (segments.length < 3) {
+    const segments = remainingStr.split("-");
+    if (segments.length < 2) {
       return {
         result: null,
         error: "文件名信息不完整，请检查格式（歌名-歌手-日期）",
       };
     }
 
-    // 从右向左：最右段为日期
-    const rawDate = segments[segments.length - 1];
-    const normalizedDate = normalizeDate(rawDate);
-    if (!normalizedDate) {
-      return {
-        result: null,
-        error: `文件名末尾未识别到日期（示例：2026-7-21），请手动填写`,
-      };
-    }
-
-    // 剩余段中查找含"星瞳"的段作为歌手
-    const remaining = segments.slice(0, -1);
-    const artistSegments = remaining.filter((s) => s.includes("星瞳"));
+    // 查找含"星瞳"的段作为歌手
+    const artistSegments = segments.filter((s) => s.includes("星瞳"));
     if (artistSegments.length === 0) {
       return {
         result: null,
@@ -538,7 +546,7 @@ function parseFilename(filename: string): { result: FilenameParseResult | null; 
     const artist = artistSegments.join("＆");
 
     // 去除歌手段后，剩余左侧段用 - 连接作为歌名
-    const titleSegments = remaining.filter((s) => !s.includes("星瞳"));
+    const titleSegments = segments.filter((s) => !s.includes("星瞳"));
     if (titleSegments.length === 0) {
       return { result: null, error: "歌曲名称不能为空" };
     }
@@ -994,7 +1002,7 @@ function LiveClipFormDialog({
                       type="audio"
                       accept="audio/*"
                       preview="audio"
-                      hint="文件名格式：歌名-歌手-日期（如 小星星-星瞳-2026-7-21），自动识别并创建合集"
+                      hint="文件名格式：歌名-歌手-日期（如 下个路口见-星瞳-2023-08-11），自动识别并创建合集"
                     />
                   </FormControl>
                   <FormMessage />
