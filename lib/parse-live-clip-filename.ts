@@ -84,7 +84,7 @@ export function parseFilename(
       };
     }
 
-    // 查找含"星瞳"的段作为歌手
+    // 查找含"星瞳"的段作为歌手（支持段内用 & 或 ＆ 分隔多个歌手）
     const artistSegments = segments.filter((s) => s.includes("星瞳"));
     if (artistSegments.length === 0) {
       return {
@@ -92,7 +92,15 @@ export function parseFilename(
         error: "文件名未识别到歌手信息（星瞳），请手动填写",
       };
     }
-    const artist = artistSegments.join("＆");
+
+    // 将所有歌手段拆分后统一用 ＆ 连接
+    // 支持半角 & 和全角 ＆ 作为段内多歌手分隔符
+    const artistNames: string[] = [];
+    for (const seg of artistSegments) {
+      const names = seg.split(/[&＆]/).map((s) => s.trim()).filter(Boolean);
+      artistNames.push(...names);
+    }
+    const artist = artistNames.join("＆");
 
     // 去除歌手段后，剩余左侧段用 - 连接作为歌名
     const titleSegments = segments.filter((s) => !s.includes("星瞳"));

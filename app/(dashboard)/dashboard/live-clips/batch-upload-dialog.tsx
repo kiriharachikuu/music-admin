@@ -272,7 +272,7 @@ export function BatchUploadDialog({
         parsedResult.artist,
       );
 
-      const artistNames = parsedResult.artist.split("＆");
+      const artistNames = parsedResult.artist.split(/[&＆]/);
       const { info: artistInfo } = await ensureArtists(artistNames);
 
       // 获取/自增 trackIndex

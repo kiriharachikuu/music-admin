@@ -556,8 +556,8 @@ function LiveClipFormDialog({
         lyricContent: "",
         status: editing.status,
       });
-      // 从 artist 文本字段反查已选歌手 ID（按 ＆ 拆分匹配）
-      const names = editing.artist.split("＆").map((s) => s.trim());
+      // 从 artist 文本字段反查已选歌手 ID（按 ＆ 或 & 拆分匹配）
+      const names = editing.artist.split(/[&＆]/).map((s) => s.trim());
       const matchedIds = artists
         .filter((a) => names.includes(a.name))
         .map((a) => a.id);
@@ -613,7 +613,7 @@ function LiveClipFormDialog({
         form.setValue("artist", result.artist);
         setParsedDate(result.date);
         // 从文件名解析的歌手文本反查歌手 ID，自动勾选
-        const parsedNames = result.artist.split("＆").map((s) => s.trim());
+        const parsedNames = result.artist.split(/[&＆]/).map((s) => s.trim());
         const matchedIds = artists
           .filter((a) => parsedNames.includes(a.name))
           .map((a) => a.id);
@@ -667,8 +667,8 @@ function LiveClipFormDialog({
         }
       }
 
-      // 歌手自动处理：按 ＆ 拆分，匹配已有/创建新歌手
-      const artistNames = filenameResult.artist.split("＆");
+      // 歌手自动处理：按 ＆ 或 & 拆分，匹配已有/创建新歌手
+      const artistNames = filenameResult.artist.split(/[&＆]/);
       const existingNames: string[] = [];
       const newNames: string[] = [];
 
