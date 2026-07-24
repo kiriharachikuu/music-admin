@@ -90,6 +90,10 @@ export interface Song {
   /** 后端返回的关联表结构，前端映射为 artists */
   songArtists?: { artist: Artist }[];
   artists?: Artist[];
+  /** 音质版本列表（后端原始关联字段名） */
+  songQualities?: { quality: string; bitrate: number; fileUrl: string; fileSize: number }[];
+  /** 前端映射后的音质列表 */
+  qualities?: { quality: string; bitrate: number; fileUrl: string; fileSize: number }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -157,6 +161,7 @@ export interface LiveClip {
   fileUrl: string;
   coverUrl?: string | null;
   lyricUrl?: string | null;
+  lyricContent?: string | null;
   status: SongStatus;
   createdAt: string;
   updatedAt: string;
@@ -270,4 +275,33 @@ export interface MigrationProgress {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+}
+
+/** 转码任务状态 */
+export type TranscodingStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+/** 转码任务 */
+export interface TranscodingJob {
+  id: string;
+  status: TranscodingStatus;
+  totalSongs: number;
+  completedSongs: number;
+  failedSongs: number;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: TranscodingJobItem[];
+}
+
+/** 转码任务项（单首歌曲） */
+export interface TranscodingJobItem {
+  id: string;
+  jobId: string;
+  songId: string;
+  songTitle: string;
+  songArtist: string;
+  status: TranscodingStatus;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

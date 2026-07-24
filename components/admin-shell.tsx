@@ -27,6 +27,7 @@ import {
   Video,
   BarChart3,
   Wrench,
+  RefreshCw,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -114,6 +115,7 @@ const MENU_GROUPS: MenuGroup[] = [
     icon: Wrench,
     roles: ["ADMIN"],
     children: [
+      { label: "转码任务", href: "/dashboard/transcoding", icon: RefreshCw },
       { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
       { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
       { label: "系统设置", href: "/dashboard/settings", icon: Settings },

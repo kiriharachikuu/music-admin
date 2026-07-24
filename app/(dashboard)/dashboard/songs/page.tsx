@@ -68,6 +68,7 @@ export default function SongsPage() {
       const mapped = (res.list ?? []).map((s) => ({
         ...s,
         tags: s.songTags?.map((st) => st.tag) ?? [],
+        qualities: s.songQualities ?? [],
       }));
       setData(mapped);
       setTotal(res.total ?? 0);
@@ -195,6 +196,7 @@ export default function SongsPage() {
   const columns = getSongColumns({
     onEdit: handleEdit,
     onDelete: (song) => setDeleteTarget(song),
+    onRefresh: () => void loadList(),
   });
 
   return (

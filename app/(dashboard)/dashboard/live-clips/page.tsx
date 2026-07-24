@@ -553,7 +553,7 @@ function LiveClipFormDialog({
         fileUrl: editing.fileUrl,
         coverUrl: editing.coverUrl || "",
         lyricUrl: editing.lyricUrl || "",
-        lyricContent: "",
+        lyricContent: editing.lyricContent || "",
         status: editing.status,
       });
       // 从 artist 文本字段反查已选歌手 ID（按 ＆ 或 & 拆分匹配）
@@ -764,18 +764,21 @@ function LiveClipFormDialog({
   async function onSubmit(values: LiveClipFormValues) {
     setSubmitting(true);
     try {
+      // lyricUrl 是幻影字段（LiveClip schema 无此列），仅用于前端文件上传控件
+      // 歌词内容已通过 FileReader 读取到 lyricContent，剥离后提交
+      const { lyricUrl: _lyricUrl, ...payload } = values;
       if (editing) {
         await request({
           method: "PUT",
           url: `/admin/live-clips/${editing.id}`,
-          data: values,
+          data: payload,
         });
         toast({ title: "保存成功" });
       } else {
         await request({
           method: "POST",
           url: "/admin/live-clips",
-          data: values,
+          data: payload,
         });
         toast({ title: "新增成功" });
       }
@@ -1027,6 +1030,17 @@ function LiveClipFormDialog({
                       <FileUpload
                         value={field.value}
                         onChange={field.onChange}
+                        onFileSelected={(file) => {
+                          // 读取歌词文件内容并填充到 lyricContent
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            const content = e.target?.result;
+                            if (typeof content === "string") {
+                              form.setValue("lyricContent", content);
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
                         type="lyric"
                         accept=".lrc,.txt"
                         preview="file"
