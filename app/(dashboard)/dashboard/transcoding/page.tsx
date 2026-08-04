@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Play, RotateCcw, RefreshCw } from "lucide-react";
+import { Loader2, Play, RotateCcw, RefreshCw, Trash2 } from "lucide-react";
 
 import { request } from "@/lib/api";
 import type { TranscodingJob } from "@/lib/types";
@@ -34,6 +34,7 @@ export default function TranscodingPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -136,6 +137,31 @@ export default function TranscodingPage() {
     void loadJobDetail(job.id);
   };
 
+  const handleDelete = async (jobId: string) => {
+    if (!confirm("确定删除此转码任务？删除后不可恢复。")) return;
+    setDeletingJobId(jobId);
+    try {
+      await request({
+        method: "DELETE",
+        url: `/admin/transcoding/jobs/${jobId}`,
+      });
+      toast({ title: "任务已删除" });
+      if (selectedJob?.id === jobId) {
+        setSelectedJob(null);
+        setJobDetail(null);
+      }
+      await loadJobs();
+    } catch (err) {
+      toast({
+        title: "删除失败",
+        description: err instanceof Error ? err.message : "请稍后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -216,6 +242,25 @@ export default function TranscodingPage() {
                               title="重试失败项"
                             >
                               <RotateCcw className={`h-3 w-3 ${retryingJobId === job.id ? "animate-spin" : ""}`} />
+                            </Button>
+                          )}
+                          {job.status !== "PROCESSING" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDelete(job.id);
+                              }}
+                              disabled={deletingJobId === job.id}
+                              title="删除任务"
+                            >
+                              {deletingJobId === job.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
                             </Button>
                           )}
                         </div>
