@@ -192,8 +192,10 @@ export interface LiveSessionDetail extends LiveSession {
 export interface StatsData {
   totalUsers: number;
   totalSongs: number;
-  todayPlays: number;
   totalPlaylists: number;
+  totalLiveClips: number;
+  totalLiveSessions: number;
+  todayPlays: number;
   playTrend: { date: string; plays: number }[];
   topSongs: {
     id: string;
@@ -201,6 +203,13 @@ export interface StatsData {
     artist: string;
     coverUrl?: string | null;
     plays: number;
+  }[];
+  topClips: {
+    id: string;
+    title: string;
+    artist: string;
+    coverUrl?: string | null;
+    favoriteCount: number;
   }[];
 }
 

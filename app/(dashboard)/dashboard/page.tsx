@@ -24,6 +24,9 @@ import {
   Image as ImageIcon,
   Rocket,
   ArrowRight,
+  Radio,
+  Scissors,
+  Heart,
 } from "lucide-react";
 
 import { request } from "@/lib/api";
@@ -41,6 +44,12 @@ function formatNumber(n: number): string {
 
 // 时长秒数格式化为 mm:ss
 function formatPlays(n: number): string {
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
+  return formatNumber(n);
+}
+
+// 收藏数格式化
+function formatFavorites(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
   return formatNumber(n);
 }
@@ -118,6 +127,12 @@ export default function DashboardPage() {
     return Math.max(...stats.topSongs.map((s) => s.plays), 1);
   }, [stats]);
 
+  // 热门歌切 Top10 中最大收藏数，用于进度条占比计算
+  const maxFavorites = useMemo(() => {
+    if (!stats?.topClips?.length) return 1;
+    return Math.max(...stats.topClips.map((c) => c.favoriteCount), 1);
+  }, [stats]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -139,8 +154,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 顶部 4 个核心指标卡片 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 顶部核心指标卡片 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard
           title="总用户数"
           value={stats ? formatNumber(stats.totalUsers) : 0}
@@ -151,6 +166,18 @@ export default function DashboardPage() {
           title="歌曲总数"
           value={stats ? formatNumber(stats.totalSongs) : 0}
           icon={Music}
+          loading={loading}
+        />
+        <StatCard
+          title="歌切总数"
+          value={stats ? formatNumber(stats.totalLiveClips) : 0}
+          icon={Scissors}
+          loading={loading}
+        />
+        <StatCard
+          title="直播场次"
+          value={stats ? formatNumber(stats.totalLiveSessions) : 0}
+          icon={Radio}
           loading={loading}
         />
         <StatCard
@@ -338,6 +365,74 @@ export default function DashboardPage() {
                   <div className="flex w-32 shrink-0 flex-col items-end gap-1 sm:w-48">
                     <span className="text-xs font-medium text-primary-700">
                       {formatPlays(song.plays)}
+                    </span>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-500 to-primary-700 transition-all"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 热门歌切排行 Top10（按收藏数排序） */}
+      <Card>
+        <CardHeader>
+          <CardTitle>热门歌切排行 Top 10</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {loading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))
+          ) : !stats?.topClips?.length ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              暂无数据
+            </p>
+          ) : (
+            stats.topClips.map((clip, index) => {
+              const percent = Math.round(
+                (clip.favoriteCount / maxFavorites) * 100,
+              );
+              return (
+                <div
+                  key={clip.id}
+                  className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50"
+                >
+                  <span
+                    className={
+                      index < 3
+                        ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-700 text-xs font-bold text-white"
+                        : "flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground"
+                    }
+                  >
+                    {index + 1}
+                  </span>
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                    {clip.coverUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={resolveMediaUrl(clip.coverUrl)}
+                        alt={clip.title}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{clip.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {clip.artist}
+                    </p>
+                  </div>
+                  <div className="flex w-32 shrink-0 flex-col items-end gap-1 sm:w-48">
+                    <span className="flex items-center gap-0.5 text-xs font-medium text-primary-700">
+                      <Heart className="h-3 w-3" />
+                      {formatFavorites(clip.favoriteCount)}
                     </span>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div
