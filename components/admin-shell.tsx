@@ -28,6 +28,7 @@ import {
   BarChart3,
   Wrench,
   RefreshCw,
+  GitMerge,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -87,6 +88,7 @@ const MENU_GROUPS: MenuGroup[] = [
     children: [
       { label: "歌曲管理", href: "/dashboard/songs", icon: Music },
       { label: "歌手管理", href: "/dashboard/artists", icon: Mic },
+      { label: "歌手合并", href: "/dashboard/artists/merge", icon: GitMerge },
       { label: "专辑管理", href: "/dashboard/albums", icon: Disc3 },
       { label: "歌单管理", href: "/dashboard/playlists", icon: ListMusic },
     ],
