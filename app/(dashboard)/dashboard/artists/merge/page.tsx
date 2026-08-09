@@ -81,23 +81,23 @@ export default function ArtistMergePage() {
     <div className="space-y-6">
       <PageHeader
         title="歌手合并"
-        description="把同一歌手的不同文件名写法（如 lulu / LULU / るる / 雫るる）合并为一个规范歌手。自动识别只给建议，需人工确认；每次合并可撤销。"
+        description="把同一歌手的不同文件名写法合并为一个规范歌手。自动识别只给建议，需人工确认；每次合并可撤销。"
       />
-      <Tabs defaultValue="shell">
+      <Tabs defaultValue="scan">
         <TabsList>
-          <TabsTrigger value="shell">空壳清理</TabsTrigger>
           <TabsTrigger value="scan">自动扫描建议</TabsTrigger>
           <TabsTrigger value="alias">别名管理</TabsTrigger>
+          <TabsTrigger value="shell">空壳清理</TabsTrigger>
           <TabsTrigger value="history">合并历史</TabsTrigger>
         </TabsList>
-        <TabsContent value="shell" className="mt-4">
-          <ShellCleanTab toast={toast} />
-        </TabsContent>
         <TabsContent value="scan" className="mt-4">
           <ScanTab toast={toast} />
         </TabsContent>
         <TabsContent value="alias" className="mt-4">
           <AliasTab toast={toast} />
+        </TabsContent>
+        <TabsContent value="shell" className="mt-4">
+          <ShellCleanTab toast={toast} />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
           <HistoryTab toast={toast} />
