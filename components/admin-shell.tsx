@@ -120,6 +120,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { label: "转码任务", href: "/dashboard/transcoding", icon: RefreshCw },
       { label: "操作日志", href: "/dashboard/logs", icon: ScrollText },
       { label: "App版本", href: "/dashboard/app-versions", icon: Smartphone },
+      { label: "平台更新日志", href: "/dashboard/platform-changelogs", icon: ScrollText },
       { label: "系统设置", href: "/dashboard/settings", icon: Settings },
     ],
   },

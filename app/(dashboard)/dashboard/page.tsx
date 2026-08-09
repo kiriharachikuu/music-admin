@@ -31,7 +31,7 @@ import {
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
-import type { StatsData, AppVersion } from "@/lib/types";
+import type { StatsData, AppVersion, PlatformChangelog } from "@/lib/types";
 import { PageHeader } from "@/components/admin/page-header";
 import { StatCard } from "@/components/admin/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,7 +81,8 @@ function ChartTooltip({
 export default function DashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [latestVersion, setLatestVersion] = useState<AppVersion | null>(null);
+  const [latestAppVersion, setLatestAppVersion] = useState<AppVersion | null>(null);
+  const [latestPlatform, setLatestPlatform] = useState<PlatformChangelog | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,8 +102,8 @@ export default function DashboardPage() {
       }
     }
 
-    // 获取最新已发布版本
-    async function loadVersion() {
+    // 获取最新已发布的 Android App 版本
+    async function loadAppVersion() {
       try {
         const res = await request<{ list: AppVersion[] }>({
           method: "GET",
@@ -110,7 +111,23 @@ export default function DashboardPage() {
           params: { limit: 1, status: "published" },
         });
         if (!cancelled && res.list?.length > 0) {
-          setLatestVersion(res.list[0]);
+          setLatestAppVersion(res.list[0]);
+        }
+      } catch {
+        // 静默失败
+      }
+    }
+
+    // 获取最新已发布的平台 Web 版本
+    async function loadPlatformVersion() {
+      try {
+        const list = await request<PlatformChangelog[]>({
+          method: "GET",
+          url: "/admin/platform-changelogs",
+          params: { limit: 1, status: "published" },
+        });
+        if (!cancelled && Array.isArray(list) && list.length > 0) {
+          setLatestPlatform(list[0]);
         }
       } catch {
         // 静默失败
@@ -118,7 +135,8 @@ export default function DashboardPage() {
     }
 
     void load();
-    void loadVersion();
+    void loadAppVersion();
+    void loadPlatformVersion();
     return () => {
       cancelled = true;
     };
@@ -138,23 +156,38 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader
           title="数据看板"
           description="XingTone平台核心运营指标一览"
         />
-        {latestVersion && (
-          <div className="flex items-center gap-2 rounded-lg border border-primary-500/20 bg-primary-500/5 px-3 py-1.5">
-            <Tag className="h-4 w-4 text-primary-700" />
-            <span className="text-xs text-foreground/60">当前版本</span>
-            <span className="text-sm font-semibold text-primary-700">
-              v{latestVersion.versionName}
-            </span>
-            <span className="text-xs text-foreground/40">
-              ({latestVersion.versionCode})
-            </span>
-          </div>
-        )}
+        {/* 区分 App 客户端与 Web 平台两个版本徽标 */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {latestAppVersion && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary-500/20 bg-primary-500/5 px-3 py-1.5">
+              <Tag className="h-4 w-4 text-primary-700" />
+              <span className="text-xs text-foreground/60">Android 客户端</span>
+              <span className="text-sm font-semibold text-primary-700">
+                v{latestAppVersion.versionName}
+              </span>
+              <span className="text-xs text-foreground/40">
+                ({latestAppVersion.versionCode})
+              </span>
+            </div>
+          )}
+          {latestPlatform && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5">
+              <Tag className="h-4 w-4 text-emerald-700" />
+              <span className="text-xs text-foreground/60">Web 平台</span>
+              <span className="text-sm font-semibold text-emerald-700">
+                v{latestPlatform.version}
+              </span>
+              <span className="text-xs text-foreground/40">
+                ({latestPlatform.versionCode})
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 顶部核心指标卡片 */}

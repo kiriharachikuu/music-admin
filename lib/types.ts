@@ -254,6 +254,20 @@ export interface AppVersion {
   updatedAt: string;
 }
 
+/** 平台 Web 端更新日志（与后端 PlatformChangelog 模型对齐） */
+export interface PlatformChangelog {
+  id: string;
+  version: string;
+  versionCode: number;
+  releaseDate: string;
+  title?: string | null;
+  /** 已解析的更新内容数组 */
+  content: string[];
+  status: "draft" | "published";
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** 操作类型（与后端拦截器推断的 action 值对齐） */
 export type OperationAction = "CREATE" | "UPDATE" | "DELETE";
 
