@@ -1,8 +1,8 @@
 "use client";
 
-// XingTone 管理后台 - 排行榜（只读）
-// 展示 4 个榜单（飙升/新歌/热歌/原创）+ 维度切换（播放量/收藏量）
-// 调用 GET /api/rankings?by=play|favorite
+// XingTone 管理后台 - 排行榜（只读，与前端 /rankings 同步）
+// 展示 3 个榜单：飙升 / 新歌 / 热歌
+// 对接 GET /api/rankings（与前端 /rankings 同一接口）
 import { useEffect, useState } from "react";
 import { Music } from "lucide-react";
 
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 
-/** 排行榜歌曲（后端 Song 模型字段子集，含 favoriteCount） */
+/** 排行榜单条记录（后端 Song 字段子集，与前端 /rankings 一致） */
 interface RankingSong {
   id: string;
   title: string;
@@ -21,52 +21,38 @@ interface RankingSong {
   coverUrl?: string | null;
   plays: number;
   favoriteCount: number;
+  releaseDate: string;
+  album?: { name: string } | null;
 }
 
-/** 后端排行榜聚合数据（字段名 soaring/newSongs） */
+/** 后端 /api/rankings 响应结构（与前端 RankingsData 一致） */
 interface RankingsResponse {
-  soaring: RankingSong[];
-  newSongs: RankingSong[];
+  soar: RankingSong[];
+  new: RankingSong[];
   hot: RankingSong[];
-  original: RankingSong[];
 }
 
 /** 前端榜单 Tab key */
-type RankingTab = "soar" | "new" | "hot" | "original";
+type RankingTab = "soar" | "new" | "hot";
 
-/** 榜单 Tab 配置：field 对应 RankingsResponse 的字段 */
+/** 榜单 Tab 配置：与前端 /rankings 保持一致 */
 const TABS: {
   key: RankingTab;
   label: string;
   field: keyof RankingsResponse;
   desc: string;
 }[] = [
-  {
-    key: "soar",
-    label: "飙升榜",
-    field: "soaring",
-    desc: "近 30 天上升最快的好歌",
-  },
-  { key: "new", label: "新歌榜", field: "newSongs", desc: "最新上架单曲" },
-  { key: "hot", label: "热歌榜", field: "hot", desc: "本周播放冠军" },
-  { key: "original", label: "原创榜", field: "original", desc: "独立音乐人之选" },
-];
-
-/** 维度切换配置 */
-const DIMENSIONS: { key: "play" | "favorite"; label: string }[] = [
-  { key: "play", label: "播放量" },
-  { key: "favorite", label: "收藏量" },
+  { key: "soar", label: "飙升榜", field: "soar", desc: "近 7 天播放增长最快" },
+  { key: "new", label: "新歌榜", field: "new", desc: "官方系统歌单人工推荐" },
+  { key: "hot", label: "热歌榜", field: "hot", desc: "近 7 天播放量冠军" },
 ];
 
 export default function RankingsAdminPage() {
   const { toast } = useToast();
-  // 维度：播放量（默认）/ 收藏量
-  const [dimension, setDimension] = useState<"play" | "favorite">("play");
   const [active, setActive] = useState<RankingTab>("soar");
   const [data, setData] = useState<RankingsResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 拉取榜单数据：维度变化时重新请求
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -75,7 +61,6 @@ export default function RankingsAdminPage() {
         const res = await request<RankingsResponse>({
           method: "GET",
           url: "/rankings",
-          params: { by: dimension },
         });
         if (!cancelled) setData(res);
       } catch (err) {
@@ -94,14 +79,29 @@ export default function RankingsAdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [dimension, toast]);
+  }, [toast]);
 
   const currentTab = TABS.find((t) => t.key === active)!;
   const songs = data ? data[currentTab.field] ?? [] : [];
 
-  // 列定义：封面 / 标题 / 歌手 / 播放量 / 收藏量
-  // 当前维度对应的列高亮显示（font-medium + text-foreground）
   const columns: DataTableColumn<RankingSong>[] = [
+    {
+      key: "rank",
+      title: "#",
+      width: 56,
+      render: (_row, index) => (
+        <span
+          className={cn(
+            "inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold",
+            index < 3
+              ? "bg-primary-700 text-white"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          {index + 1}
+        </span>
+      ),
+    },
     {
       key: "cover",
       title: "封面",
@@ -126,11 +126,21 @@ export default function RankingsAdminPage() {
     {
       key: "title",
       title: "标题",
-      render: (row) => <span className="font-medium">{row.title}</span>,
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium">{row.title}</p>
+          {row.album?.name && (
+            <p className="truncate text-xs text-muted-foreground">
+              《{row.album.name}》
+            </p>
+          )}
+        </div>
+      ),
     },
     {
       key: "artist",
       title: "歌手",
+      width: 160,
       render: (row) => (
         <span className="text-muted-foreground">{row.artist}</span>
       ),
@@ -140,31 +150,7 @@ export default function RankingsAdminPage() {
       title: "播放量",
       width: 120,
       render: (row) => (
-        <span
-          className={cn(
-            dimension === "play"
-              ? "font-medium text-foreground"
-              : "text-muted-foreground"
-          )}
-        >
-          {formatPlays(row.plays)}
-        </span>
-      ),
-    },
-    {
-      key: "favoriteCount",
-      title: "收藏量",
-      width: 120,
-      render: (row) => (
-        <span
-          className={cn(
-            dimension === "favorite"
-              ? "font-medium text-foreground"
-              : "text-muted-foreground"
-          )}
-        >
-          {formatPlays(row.favoriteCount ?? 0)}
-        </span>
+        <span className="font-medium">{formatPlays(row.plays ?? 0)}</span>
       ),
     },
   ];
@@ -173,31 +159,7 @@ export default function RankingsAdminPage() {
     <div className="space-y-6">
       <PageHeader
         title="排行榜"
-        description="查看各榜单歌曲排行（只读）"
-        actions={
-          /* 维度切换：圆角分段（播放量 / 收藏量） */
-          <div className="inline-flex items-center gap-1 rounded-full bg-muted p-1">
-            {DIMENSIONS.map((d) => {
-              const isActive = dimension === d.key;
-              return (
-                <button
-                  key={d.key}
-                  type="button"
-                  onClick={() => setDimension(d.key)}
-                  aria-pressed={isActive}
-                  className={cn(
-                    "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary-700 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {d.label}
-                </button>
-              );
-            })}
-          </div>
-        }
+        description="查看各榜单歌曲排行（与前端 /rankings 同步，只读）"
       />
 
       {/* 榜单 Tab：下划线式 */}
@@ -217,7 +179,6 @@ export default function RankingsAdminPage() {
               )}
             >
               {t.label}
-              {/* 选中下划线 */}
               {isActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary-700" />
               )}

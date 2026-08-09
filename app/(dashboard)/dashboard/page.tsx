@@ -37,21 +37,24 @@ import { StatCard } from "@/components/admin/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// 数字千分位格式化
-function formatNumber(n: number): string {
-  return n.toLocaleString("zh-CN");
+// 数字千分位格式化（容错：null/undefined/NaN 视作 0）
+function formatNumber(n: unknown): string {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return v.toLocaleString("zh-CN");
 }
 
 // 时长秒数格式化为 mm:ss
-function formatPlays(n: number): string {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
-  return formatNumber(n);
+function formatPlays(n: unknown): string {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
+  return formatNumber(v);
 }
 
 // 收藏数格式化
-function formatFavorites(n: number): string {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
-  return formatNumber(n);
+function formatFavorites(n: unknown): string {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
+  return formatNumber(v);
 }
 
 // 图表 Tooltip 自定义渲染
@@ -158,37 +161,37 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard
           title="总用户数"
-          value={stats ? formatNumber(stats.totalUsers) : 0}
+          value={formatNumber(stats?.totalUsers)}
           icon={Users}
           loading={loading}
         />
         <StatCard
           title="歌曲总数"
-          value={stats ? formatNumber(stats.totalSongs) : 0}
+          value={formatNumber(stats?.totalSongs)}
           icon={Music}
           loading={loading}
         />
         <StatCard
           title="歌切总数"
-          value={stats ? formatNumber(stats.totalLiveClips) : 0}
+          value={formatNumber(stats?.totalLiveClips)}
           icon={Scissors}
           loading={loading}
         />
         <StatCard
           title="直播场次"
-          value={stats ? formatNumber(stats.totalLiveSessions) : 0}
+          value={formatNumber(stats?.totalLiveSessions)}
           icon={Radio}
           loading={loading}
         />
         <StatCard
           title="今日播放量"
-          value={stats ? formatNumber(stats.todayPlays) : 0}
+          value={formatNumber(stats?.todayPlays)}
           icon={Play}
           loading={loading}
         />
         <StatCard
           title="歌单总数"
-          value={stats ? formatNumber(stats.totalPlaylists) : 0}
+          value={formatNumber(stats?.totalPlaylists)}
           icon={ListMusic}
           loading={loading}
         />
