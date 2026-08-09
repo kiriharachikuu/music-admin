@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { GitMerge, RefreshCw, Trash2, Undo2, FlaskConical } from "lucide-react";
+import { GitMerge, RefreshCw, Trash2, Undo2, FlaskConical, Sparkles, EyeOff } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +63,8 @@ interface LogRow {
   id: string;
   canonicalName: string;
   aliases: string[];
+  kind?: string;
+  batchId?: string | null;
   clipCount: number;
   songCount: number;
   operatorName?: string;
@@ -81,12 +83,16 @@ export default function ArtistMergePage() {
         title="歌手合并"
         description="把同一歌手的不同文件名写法（如 lulu / LULU / るる / 雫るる）合并为一个规范歌手。自动识别只给建议，需人工确认；每次合并可撤销。"
       />
-      <Tabs defaultValue="scan">
+      <Tabs defaultValue="shell">
         <TabsList>
+          <TabsTrigger value="shell">空壳清理</TabsTrigger>
           <TabsTrigger value="scan">自动扫描建议</TabsTrigger>
           <TabsTrigger value="alias">别名管理</TabsTrigger>
           <TabsTrigger value="history">合并历史</TabsTrigger>
         </TabsList>
+        <TabsContent value="shell" className="mt-4">
+          <ShellCleanTab toast={toast} />
+        </TabsContent>
         <TabsContent value="scan" className="mt-4">
           <ScanTab toast={toast} />
         </TabsContent>
@@ -97,6 +103,155 @@ export default function ArtistMergePage() {
           <HistoryTab toast={toast} />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/* ============ 空壳清理 ============ */
+interface ShellPlan {
+  canonicalName: string;
+  canonicalArtistId?: string;
+  aliases: string[];
+  targetSongs: number;
+  targetClips: number;
+  shellCount: number;
+}
+function ShellCleanTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
+  const [auto, setAuto] = useState<ShellPlan[]>([]);
+  const [manual, setManual] = useState<Cluster[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [mode, setMode] = useState<"hide" | "delete">("hide");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await request<{ auto: ShellPlan[]; manual: Cluster[] }>({
+        method: "GET",
+        url: "/admin/artist-merge/auto-clean/preview",
+      });
+      setAuto(res.auto ?? []);
+      setManual(res.manual ?? []);
+    } catch (err) {
+      toast({ title: "扫描失败", description: msg(err), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+  useEffect(() => void load(), [load]);
+
+  async function apply() {
+    if (!auto.length) return;
+    if (mode === "delete" && !window.confirm(`将把 ${auto.length} 组空壳歌手【彻底删除】并入有歌的歌手。仍可在"合并历史"里撤销。确定继续？`)) return;
+    setApplying(true);
+    try {
+      const res = await request<{ mergedCount: number; batchId: string }>({
+        method: "POST",
+        url: "/admin/artist-merge/auto-clean/apply",
+        data: { mode },
+      });
+      toast({
+        title: "自动清理完成",
+        description: `合并 ${res.mergedCount} 组空壳（${mode === "delete" ? "已彻底删除" : "已隐藏"}），可在"合并历史"整批撤销`,
+      });
+      void load();
+    } catch (err) {
+      toast({ title: "执行失败", description: msg(err), variant: "destructive" });
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-start gap-2">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              把"名字相似、只有一个有歌、其余是空壳"的重复歌手，<b className="text-foreground">自动把空壳并入有歌的那个</b>（有歌优先）。
+              拿不准的（多个都有歌）不会自动处理，留到"自动扫描建议"里人工确认。
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4 text-sm">
+              <span>空壳处理方式：</span>
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input type="radio" checked={mode === "hide"} onChange={() => setMode("hide")} />
+                <EyeOff className="h-3.5 w-3.5" /> 隐藏（可恢复）
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input type="radio" checked={mode === "delete"} onChange={() => setMode("delete")} />
+                <Trash2 className="h-3.5 w-3.5" /> 彻底删除
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> 重新扫描
+              </Button>
+              <Button size="sm" onClick={() => void apply()} disabled={applying || auto.length === 0}>
+                <Sparkles className="h-4 w-4" /> {applying ? "处理中…" : `一键清理 ${auto.length} 组`}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">扫描中…</p>
+      ) : (
+        <>
+          <div>
+            <p className="mb-2 text-sm font-medium">
+              可自动清理 <span className="text-primary">{auto.length}</span> 组
+            </p>
+            {auto.length === 0 ? (
+              <p className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
+                没有可自动清理的空壳 🎉
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {auto.map((p, i) => (
+                  <Card key={i}>
+                    <CardContent className="flex items-center justify-between gap-3 p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <Badge className="gap-1"><GitMerge className="h-3 w-3" />{p.canonicalName}</Badge>
+                        <span className="text-xs text-muted-foreground">（{p.targetSongs} 首歌 · {p.targetClips} 歌切）</span>
+                        <span className="text-muted-foreground">←</span>
+                        {p.aliases.map((a) => (
+                          <span key={a} className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground line-through">{a}</span>
+                        ))}
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{p.shellCount} 个空壳</span>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {manual.length > 0 && (
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                需人工确认 <span className="text-amber-600">{manual.length}</span> 组
+                <span className="ml-2 text-xs font-normal text-muted-foreground">（多个都有歌，可能是不同的人 → 去"自动扫描建议"里处理）</span>
+              </p>
+              <div className="space-y-1.5">
+                {manual.slice(0, 20).map((c, i) => (
+                  <div key={i} className="flex flex-wrap gap-1.5 rounded-md border px-3 py-2 text-xs">
+                    {c.members.map((m) => (
+                      <span key={m.name} className="rounded bg-muted px-2 py-0.5">
+                        {m.name}
+                        <span className="ml-1 text-muted-foreground">({m.songs}/{m.clips})</span>
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -451,12 +606,14 @@ function AliasTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
 function HistoryTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   const [list, setList] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await request<{ list: LogRow[] }>({ method: "GET", url: "/admin/artist-merge/logs" });
       setList(res.list ?? []);
+      setSelected(new Set());
     } catch (err) {
       toast({ title: "加载失败", description: msg(err), variant: "destructive" });
     } finally {
@@ -465,18 +622,70 @@ function HistoryTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) 
   }, [toast]);
   useEffect(() => void load(), [load]);
 
+  const revertable = list.filter((h) => !h.reverted);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const s = new Set(prev);
+      s.has(id) ? s.delete(id) : s.add(id);
+      return s;
+    });
+  }
+  function toggleAll() {
+    setSelected((prev) =>
+      prev.size === revertable.length ? new Set() : new Set(revertable.map((h) => h.id)),
+    );
+  }
+
   async function undo(id: string) {
     try {
       await request({ method: "POST", url: `/admin/artist-merge/logs/${id}/revert` });
-      toast({ title: "已撤销", description: "数据按快照回滚，别名已移除" });
+      toast({ title: "已撤销", description: "数据按快照回滚" });
       void load();
     } catch (err) {
       toast({ title: "撤销失败", description: msg(err), variant: "destructive" });
     }
   }
+  async function undoMany() {
+    if (!selected.size) return;
+    try {
+      const res = await request<{ reverted: number; total: number }>({
+        method: "POST",
+        url: "/admin/artist-merge/logs/revert-many",
+        data: { ids: Array.from(selected) },
+      });
+      toast({ title: "批量撤销完成", description: `成功撤销 ${res.reverted}/${res.total} 条` });
+      void load();
+    } catch (err) {
+      toast({ title: "批量撤销失败", description: msg(err), variant: "destructive" });
+    }
+  }
+  async function undoBatch(batchId: string) {
+    try {
+      const res = await request<{ reverted: number; total: number }>({
+        method: "POST",
+        url: `/admin/artist-merge/logs/batch/${batchId}/revert`,
+      });
+      toast({ title: "整批撤销完成", description: `成功撤销 ${res.reverted}/${res.total} 条` });
+      void load();
+    } catch (err) {
+      toast({ title: "整批撤销失败", description: msg(err), variant: "destructive" });
+    }
+  }
 
   return (
     <div className="space-y-3">
+      {revertable.length > 0 && (
+        <div className="flex items-center gap-3 text-sm">
+          <label className="flex cursor-pointer items-center gap-1.5 text-muted-foreground">
+            <input type="checkbox" checked={selected.size === revertable.length && revertable.length > 0} onChange={toggleAll} />
+            全选可撤销
+          </label>
+          <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600" disabled={!selected.size} onClick={() => void undoMany()}>
+            <Undo2 className="h-4 w-4" /> 批量撤销{selected.size ? `（${selected.size}）` : ""}
+          </Button>
+        </div>
+      )}
       {loading ? (
         <p className="py-10 text-center text-sm text-muted-foreground">加载中…</p>
       ) : list.length === 0 ? (
@@ -484,23 +693,41 @@ function HistoryTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) 
       ) : (
         list.map((h) => (
           <Card key={h.id}>
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{h.canonicalName}</span>
-                  <span className="text-xs text-muted-foreground">← {h.aliases.join("、")}</span>
-                  {h.reverted && <Badge variant="outline" className="text-rose-500">已撤销</Badge>}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(h.createdAt).toLocaleString("zh-CN")} · 改写 {h.clipCount} 歌切 / {h.songCount} 歌曲
-                  {h.operatorName ? ` · ${h.operatorName}` : ""}
+            <CardContent className="flex items-center justify-between gap-2 p-4">
+              <div className="flex items-start gap-3">
+                {!h.reverted && (
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={selected.has(h.id)}
+                    onChange={() => toggle(h.id)}
+                  />
+                )}
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{h.canonicalName}</span>
+                    <span className="text-xs text-muted-foreground">← {h.aliases.join("、")}</span>
+                    {h.kind === "auto" && <Badge variant="secondary" className="text-[10px]">空壳清理</Badge>}
+                    {h.reverted && <Badge variant="outline" className="text-rose-500">已撤销</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(h.createdAt).toLocaleString("zh-CN")} · 改写 {h.clipCount} 歌切 / {h.songCount} 歌曲
+                    {h.operatorName ? ` · ${h.operatorName}` : ""}
+                  </div>
                 </div>
               </div>
-              {!h.reverted && (
-                <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600" onClick={() => void undo(h.id)}>
-                  <Undo2 className="h-4 w-4" /> 撤销
-                </Button>
-              )}
+              <div className="flex shrink-0 items-center gap-1">
+                {!h.reverted && h.batchId && (
+                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => void undoBatch(h.batchId!)}>
+                    整批撤销
+                  </Button>
+                )}
+                {!h.reverted && (
+                  <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600" onClick={() => void undo(h.id)}>
+                    <Undo2 className="h-4 w-4" /> 撤销
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))
