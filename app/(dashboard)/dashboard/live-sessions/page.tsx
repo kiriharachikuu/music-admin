@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { FileUpload } from "@/components/admin/file-upload";
+import { ArtistSelector } from "../artists/artist-selector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,6 +46,8 @@ import {
 
 const liveSessionSchema = z.object({
   title: z.string().min(1, "请输入标题"),
+  // 兼容字段：保留必填校验以保证后端在未传 artistIds 时的兜底；
+  // 由 ArtistSelector 同步写入拼接后的字符串。
   artist: z.string().min(1, "请选择歌手"),
   liveTime: z.string().min(1, "请选择直播时间"),
   cover: z.string(),
@@ -414,6 +417,7 @@ function LiveSessionFormDialog({
   const [submitting, setSubmitting] = useState(false);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(false);
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
 
   const form = useForm<LiveSessionFormValues>({
     resolver: zodResolver(liveSessionSchema),
@@ -461,6 +465,20 @@ function LiveSessionFormDialog({
         description: editing.description || "",
         status: editing.status,
       });
+      // 优先使用后端返回的关联数组；回退到按名字反查本地 artist 列表
+      const relationIds =
+        editing.liveSessionArtists
+          ?.map((la) => la.artist.id)
+          .filter(Boolean) ?? [];
+      if (relationIds.length > 0) {
+        setSelectedArtistIds(relationIds);
+      } else {
+        const names = (editing.artist || "").split(/[&＆]/).map((s) => s.trim());
+        const matchedIds = artists
+          .filter((a) => names.includes(a.name))
+          .map((a) => a.id);
+        setSelectedArtistIds(matchedIds);
+      }
     } else {
       form.reset({
         title: "",
@@ -470,8 +488,18 @@ function LiveSessionFormDialog({
         description: "",
         status: "DRAFT",
       });
+      setSelectedArtistIds([]);
     }
-  }, [open, editing, form]);
+  }, [open, editing, form, artists]);
+
+  // 歌手选择变化时，同步更新 artist 文本字段（用 ＆ 连接歌手名）
+  function handleArtistSelectedChange(ids: string[]) {
+    setSelectedArtistIds(ids);
+    const selectedNames = ids
+      .map((id) => artists.find((a) => a.id === id)?.name)
+      .filter(Boolean) as string[];
+    form.setValue("artist", selectedNames.join("＆"), { shouldValidate: true });
+  }
 
   async function onSubmit(values: LiveSessionFormValues) {
     setSubmitting(true);
@@ -482,10 +510,13 @@ function LiveSessionFormDialog({
         ? `${values.liveTime}:00.000Z`
         : values.liveTime;
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...values,
         liveTime: liveTimeISO,
       };
+      // 优先发送 artistIds；后端会按 sort 顺序维护关联并派生 artist 字符串
+      payload.artistIds = selectedArtistIds;
+
       if (editing) {
         await request({
           method: "PUT",
@@ -540,38 +571,23 @@ function LiveSessionFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="artist"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>歌手</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={loadingArtists}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            loadingArtists ? "加载歌手列表..." : "请选择歌手"
-                          }
-                        />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {artists.map((artist) => (
-                        <SelectItem key={artist.id} value={artist.name}>
-                          {artist.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+            <div className="space-y-2">
+              <ArtistSelector
+                selectedIds={selectedArtistIds}
+                onSelectedChange={handleArtistSelectedChange}
+                artists={artists}
+              />
+              {/* 隐藏的 artist 文本字段，与后端 liveSession.artist 兼容 */}
+              <input type="hidden" {...form.register("artist")} />
+              {form.formState.errors.artist && (
+                <p className="text-sm font-medium text-destructive">
+                  {form.formState.errors.artist.message}
+                </p>
               )}
-            />
+              {loadingArtists && (
+                <p className="text-xs text-muted-foreground">加载歌手列表…</p>
+              )}
+            </div>
 
             <FormField
               control={form.control}

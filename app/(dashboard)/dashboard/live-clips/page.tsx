@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Pencil, Plus, Trash2, Eye, EyeOff, UploadCloud } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, Eye, EyeOff, UploadCloud, X } from "lucide-react";
 
 import { request } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/utils";
@@ -507,6 +507,16 @@ function LiveClipFormDialog({
   onArtistsChange,
   onSuccess,
 }: LiveClipFormDialogProps) {
+  /**
+   * 封面优先级（用户可见的展示顺序）：
+   * 1. 歌切自定义封面 coverUrl（管理员在当前表单上传）
+   * 2. 所属场次封面 session.cover
+   *
+   * 后端在 `LiveSessionService.listClips` / `listClips` / `getFavoriteClips` 中
+   * 使用 `cover: clip.coverUrl ?? clip.session?.cover` 实现该回退。
+   * 清除自定义封面 = 将 coverUrl 设为空字符串，由后端在保存时转 null。
+   */
+
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -556,12 +566,21 @@ function LiveClipFormDialog({
         lyricContent: editing.lyricContent || "",
         status: editing.status,
       });
-      // 从 artist 文本字段反查已选歌手 ID（按 ＆ 或 & 拆分匹配）
-      const names = editing.artist.split(/[&＆]/).map((s) => s.trim());
-      const matchedIds = artists
-        .filter((a) => names.includes(a.name))
-        .map((a) => a.id);
-      setSelectedArtistIds(matchedIds);
+      // 优先使用后端返回的关联数组；回退到按名字反查本地 artist 列表
+      const relationIds =
+        editing.liveClipArtists
+          ?.map((la) => la.artist.id)
+          .filter(Boolean) ?? [];
+      if (relationIds.length > 0) {
+        setSelectedArtistIds(relationIds);
+      } else {
+        // 从 artist 文本字段反查已选歌手 ID（按 ＆ 或 & 拆分匹配）
+        const names = editing.artist.split(/[&＆]/).map((s) => s.trim());
+        const matchedIds = artists
+          .filter((a) => names.includes(a.name))
+          .map((a) => a.id);
+        setSelectedArtistIds(matchedIds);
+      }
     } else {
       form.reset({
         title: "",
@@ -766,7 +785,9 @@ function LiveClipFormDialog({
     try {
       // lyricUrl 是幻影字段（LiveClip schema 无此列），仅用于前端文件上传控件
       // 歌词内容已通过 FileReader 读取到 lyricContent，剥离后提交
-      const { lyricUrl: _lyricUrl, ...payload } = values;
+      const { lyricUrl: _lyricUrl, ...rest } = values;
+      // 优先发送 artistIds；后端会按 sort 顺序维护关联并派生 artist 字符串
+      const payload = { ...rest, artistIds: selectedArtistIds };
       if (editing) {
         await request({
           method: "PUT",
@@ -1007,14 +1028,28 @@ function LiveClipFormDialog({
                   <FormItem>
                     <FormLabel>封面图片</FormLabel>
                     <FormControl>
-                      <FileUpload
-                        value={field.value}
-                        onChange={field.onChange}
-                        type="image"
-                        accept="image/*"
-                        preview="image"
-                        hint="建议 1:1 正方形，可选"
-                      />
+                      <div className="space-y-2">
+                        <FileUpload
+                          value={field.value}
+                          onChange={field.onChange}
+                          type="image"
+                          accept="image/*"
+                          preview="image"
+                          hint="建议 1:1 正方形，可选"
+                        />
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => field.onChange("")}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="mr-1 h-3 w-3" />
+                            清空自定义封面（将使用场次封面）
+                          </Button>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

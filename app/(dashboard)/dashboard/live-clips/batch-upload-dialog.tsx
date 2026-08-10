@@ -161,19 +161,24 @@ export function BatchUploadDialog({
 
   /**
    * 自动创建不存在的歌手
-   * 返回处理信息描述
+   * 返回处理信息描述 + 全部命中（含已存在/新建）的歌手 ID 列表
    */
   async function ensureArtists(
     artistNames: string[],
-  ): Promise<{ info: string; created: Artist[] }> {
+  ): Promise<{ info: string; created: Artist[]; ids: string[] }> {
     const existingNames: string[] = [];
     const newNames: string[] = [];
+    const existingIds: string[] = [];
 
     for (const name of artistNames) {
       const trimmed = name.trim();
       if (!trimmed) continue;
-      if (artistsRef.current.some((a) => a.name === trimmed)) {
+      const match = artistsRef.current.find(
+        (a) => a.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (match) {
         existingNames.push(trimmed);
+        existingIds.push(match.id);
       } else {
         newNames.push(trimmed);
       }
@@ -214,7 +219,35 @@ export function BatchUploadDialog({
       parts.push(`${failedNames.join("、")}（创建失败）`);
     }
 
-    return { info: parts.length > 0 ? parts.join("、") : "", created: createdArtists };
+    // 完整 ID 列表 = 已存在 + 新建（按 artistNames 顺序）
+    const createdIds = createdArtists
+      .map((a) => a.name)
+      .map((name) => {
+        const cur = artistsRef.current.find(
+          (a) => a.name.toLowerCase() === name.toLowerCase(),
+        );
+        return cur?.id;
+      })
+      .filter((id): id is string => !!id);
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const name of artistNames) {
+      const trimmed = name.trim();
+      if (!trimmed) continue;
+      const id =
+        existingIds.find((eid, i) => existingNames[i] === trimmed && !seen.has(eid))
+        ??
+        createdIds.find((cid) => {
+          const ca = artistsRef.current.find((a) => a.id === cid);
+          return ca?.name === trimmed && !seen.has(cid);
+        });
+      if (id) {
+        ids.push(id);
+        seen.add(id);
+      }
+    }
+
+    return { info: parts.length > 0 ? parts.join("、") : "", created: createdArtists, ids };
   }
 
   // 处理单个文件
@@ -273,7 +306,7 @@ export function BatchUploadDialog({
       );
 
       const artistNames = parsedResult.artist.split(/[&＆]/);
-      const { info: artistInfo } = await ensureArtists(artistNames);
+      const { info: artistInfo, ids: artistIds } = await ensureArtists(artistNames);
 
       // 获取/自增 trackIndex
       const sessionId = session.id;
@@ -295,6 +328,7 @@ export function BatchUploadDialog({
         data: {
           title: parsedResult.title,
           artist: parsedResult.artist,
+          artistIds,
           sessionId,
           trackIndex: nextIndex,
           duration: metadata.duration || 0,

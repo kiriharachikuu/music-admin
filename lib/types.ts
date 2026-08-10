@@ -163,6 +163,8 @@ export interface LiveClip {
   lyricUrl?: string | null;
   lyricContent?: string | null;
   status: SongStatus;
+  /** 后端返回的关联表结构，前端可映射为 artists */
+  liveClipArtists?: { artist: { id: string; name: string }; sort: number }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -179,6 +181,8 @@ export interface LiveSession {
   /** 场次编号 */
   sessionNumber?: number | null;
   status: SongStatus;
+  /** 后端返回的关联表结构，前端可映射为 artists */
+  liveSessionArtists?: { artist: { id: string; name: string }; sort: number }[];
   createdAt: string;
   updatedAt: string;
 }
