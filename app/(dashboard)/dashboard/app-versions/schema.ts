@@ -11,7 +11,8 @@ export const appVersionSchema = z.object({
   forceUpdate: z.boolean(),
   minVersionCode: z.number().int("最低版本需为整数").min(0, "最低版本需 ≥ 0"),
   channel: z.enum(["stable", "beta"]),
-  platform: z.enum(["android", "ios", "desktop"]),
+  platform: z.enum(["android", "windows", "ios"]),
+  variant: z.enum(["full", "setup", "portable"]),
   status: z.enum(["draft", "published", "deprecated"]),
 });
 
@@ -30,6 +31,7 @@ export const appVersionFormDefaultValues: AppVersionFormValues = {
   minVersionCode: 0,
   channel: "stable",
   platform: "android",
+  variant: "full",
   status: "published",
 };
 
@@ -40,8 +42,14 @@ export const CHANNEL_OPTIONS = [
 
 export const PLATFORM_OPTIONS = [
   { value: "android", label: "Android" },
+  { value: "windows", label: "Windows" },
   { value: "ios", label: "iOS" },
-  { value: "desktop", label: "桌面端" },
+] as const;
+
+export const VARIANT_OPTIONS = [
+  { value: "full", label: "完整包 (APK)" },
+  { value: "setup", label: "安装版 (Setup)" },
+  { value: "portable", label: "便携版 (Portable)" },
 ] as const;
 
 export const STATUS_OPTIONS = [

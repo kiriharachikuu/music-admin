@@ -252,6 +252,8 @@ export interface AppVersion {
   minVersionCode: number;
   channel: string;
   platform: string;
+  /** 发布形态：full(APK完整包) / setup(Win安装版) / portable(Win便携版) */
+  variant: string;
   status: string;
   downloadCount: number;
   createdAt: string;

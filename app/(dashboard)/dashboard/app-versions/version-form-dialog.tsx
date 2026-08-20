@@ -22,6 +22,7 @@ import {
   CHANNEL_OPTIONS,
   PLATFORM_OPTIONS,
   STATUS_OPTIONS,
+  VARIANT_OPTIONS,
   type AppVersionFormValues,
 } from "./schema";
 
@@ -72,13 +73,35 @@ export function VersionFormDialog({
         forceUpdate: editing.forceUpdate ?? false,
         minVersionCode: editing.minVersionCode ?? 0,
         channel: (editing.channel as "stable" | "beta") ?? "stable",
-        platform: (editing.platform as "android" | "ios" | "desktop") ?? "android",
+        // 旧数据 desktop 统一映射为 windows
+        platform:
+          (editing.platform === "desktop"
+            ? "windows"
+            : (editing.platform as "android" | "windows" | "ios")) ?? "android",
+        variant: (editing.variant as "full" | "setup" | "portable") ?? "full",
         status: (editing.status as "draft" | "published" | "deprecated") ?? "draft",
       });
     } else {
       form.reset(appVersionFormDefaultValues);
     }
   }, [open, editing, form]);
+
+  const platform = form.watch("platform");
+  const isWindows = platform === "windows";
+  const acceptExt = isWindows ? ".exe" : ".apk";
+
+  // 切换平台时清理不匹配的已选文件（apk <-> exe）
+  function handlePlatformChange(value: "android" | "windows" | "ios") {
+    form.setValue("platform", value);
+    if (value !== "windows") {
+      form.setValue("variant", "full");
+    }
+    const nextExt = value === "windows" ? ".exe" : ".apk";
+    if (uploadedFile && !uploadedFile.name.toLowerCase().endsWith(nextExt)) {
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   async function onSubmit(values: AppVersionFormValues) {
     setSubmitting(true);
@@ -220,7 +243,7 @@ export function VersionFormDialog({
                     <FormLabel>平台</FormLabel>
                     <Select
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={handlePlatformChange}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -267,6 +290,36 @@ export function VersionFormDialog({
                 )}
               />
             </div>
+
+            {isWindows && (
+              <FormField
+                control={form.control}
+                name="variant"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>发布形态</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {VARIANT_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -319,22 +372,22 @@ export function VersionFormDialog({
 
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                APK 文件上传
+                {isWindows ? "EXE 文件上传" : "APK 文件上传"}
               </label>
               <div className="relative">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".apk"
+                  accept={acceptExt}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file && file.name.endsWith('.apk')) {
+                    if (file && file.name.toLowerCase().endsWith(acceptExt)) {
                       setUploadedFile(file);
                       form.setValue("fileSize", file.size);
                     } else if (file) {
                       toast({
                         title: '文件格式错误',
-                        description: '请上传 APK 格式的文件',
+                        description: `请上传 ${acceptExt.slice(1).toUpperCase()} 格式的文件`,
                         variant: 'destructive',
                       });
                       e.target.value = '';
@@ -351,7 +404,7 @@ export function VersionFormDialog({
                   disabled={!!editing || !!uploadedFile}
                 >
                   <Upload className="h-4 w-4" />
-                  {uploadedFile ? '已选择文件' : '选择 APK 文件'}
+                  {uploadedFile ? '已选择文件' : isWindows ? '选择 EXE 文件' : '选择 APK 文件'}
                 </Button>
                 {uploadedFile && (
                   <div className="flex items-center gap-3 rounded-lg border border-border p-3">
@@ -388,7 +441,7 @@ export function VersionFormDialog({
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://.../app-release.apk"
+                        placeholder={isWindows ? "https://.../XingTone-Setup.exe" : "https://.../app-release.apk"}
                         {...field}
                         value={field.value ?? ""}
                       />

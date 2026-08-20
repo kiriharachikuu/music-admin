@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { CHANNEL_OPTIONS, PLATFORM_OPTIONS, STATUS_OPTIONS } from "./schema";
+import { CHANNEL_OPTIONS, PLATFORM_OPTIONS, STATUS_OPTIONS, VARIANT_OPTIONS } from "./schema";
 import { VersionFormDialog } from "./version-form-dialog";
 
 export default function AppVersionsPage() {
@@ -132,8 +132,22 @@ export default function AppVersionsPage() {
       title: "平台",
       width: 100,
       render: (r) => {
-        const opt = PLATFORM_OPTIONS.find((o) => o.value === r.platform);
+        // 旧数据 desktop 统一映射为 windows 展示
+        const raw = r.platform === "desktop" ? "windows" : r.platform;
+        const opt = PLATFORM_OPTIONS.find((o) => o.value === raw);
         return <Badge variant="outline">{opt?.label ?? r.platform}</Badge>;
+      },
+    },
+    {
+      key: "variant",
+      title: "变体",
+      width: 110,
+      render: (r) => {
+        if (r.platform !== "windows") {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        const opt = VARIANT_OPTIONS.find((o) => o.value === r.variant && o.value !== "full");
+        return <Badge variant="secondary">{opt?.label ?? r.variant}</Badge>;
       },
     },
     {
