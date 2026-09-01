@@ -14,6 +14,20 @@ export const appVersionSchema = z.object({
   platform: z.enum(["android", "windows", "ios"]),
   variant: z.enum(["full", "setup", "portable"]),
   status: z.enum(["draft", "published", "deprecated"]),
+}).superRefine((data, ctx) => {
+  // PC 客户端按语义化版本号（semver）比较 versionName，
+  // Windows 平台若填入非 semver 格式会导致 /update/pc 解析失败、检测不到更新，故发布前强校验
+  if (data.platform === "windows") {
+    const v = (data.versionName ?? "").trim();
+    // 与后端 semver.util.ts 解析规则一致：可选 v 前缀、1~3 段数字、可选预发布后缀
+    if (!/^v?\d+(?:\.\d+){0,2}(?:-[\w.-]+)?$/.test(v)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["versionName"],
+        message: "Windows 版本名称需为语义化版本号（如 1.2.0）",
+      });
+    }
+  }
 });
 
 export type AppVersionFormValues = z.infer<typeof appVersionSchema>;

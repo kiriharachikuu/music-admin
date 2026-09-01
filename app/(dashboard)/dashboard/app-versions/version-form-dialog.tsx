@@ -95,6 +95,10 @@ export function VersionFormDialog({
     form.setValue("platform", value);
     if (value !== "windows") {
       form.setValue("variant", "full");
+      form.clearErrors("versionName");
+    } else {
+      // 切到 Windows 立即按 semver 重新校验版本名称
+      void form.trigger("versionName");
     }
     const nextExt = value === "windows" ? ".exe" : ".apk";
     if (uploadedFile && !uploadedFile.name.toLowerCase().endsWith(nextExt)) {
