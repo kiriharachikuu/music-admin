@@ -29,18 +29,18 @@ import { Switch } from "@/components/ui/switch";
 
 import { AvatarFrameFormDialog } from "./form-dialog";
 
-/** 佩戴效果预览：圆形底像 + 框图叠加（与客户端渲染方式一致） */
+/** 佩戴效果预览：挂件布局 —— 容器 = 框画布，头像缩小至 58% 居中（与客户端渲染方式一致） */
 function FramePreview({ frame }: { frame: AvatarFrame }) {
   return (
-    <div className="relative h-14 w-14">
-      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-muted">
-        <UserRound className="h-7 w-7 text-muted-foreground/50" />
+    <div className="relative h-16 w-16">
+      <div className="absolute left-1/2 top-1/2 flex h-[58%] w-[58%] -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-muted">
+        <UserRound className="h-1/2 w-1/2 text-muted-foreground/50" />
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={resolveMediaUrl(frame.imageUrl)}
         alt={frame.name}
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[116%] w-[116%] -translate-x-1/2 -translate-y-1/2 object-contain"
+        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
       />
     </div>
   );
