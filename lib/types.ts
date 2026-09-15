@@ -27,6 +27,21 @@ export interface UploadResult {
 export type Role = "USER" | "ADMIN" | "EDITOR";
 export type SongStatus = "PUBLISHED" | "DRAFT";
 export type BannerStatus = "VISIBLE" | "HIDDEN";
+export type AvatarFrameStatus = "VISIBLE" | "HIDDEN";
+
+/** 头像框 */
+export interface AvatarFrame {
+  id: string;
+  name: string;
+  /** 框图 URL（PNG 透明环） */
+  imageUrl: string;
+  sort: number;
+  status: AvatarFrameStatus;
+  createdAt: string;
+  updatedAt: string;
+  /** 佩戴人数（后台列表返回） */
+  _count?: { users: number };
+}
 
 /** 用户 */
 export interface User {

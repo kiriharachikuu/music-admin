@@ -30,6 +30,7 @@ import {
   RefreshCw,
   GitMerge,
   Search as SearchIcon,
+  Sparkles,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -109,6 +110,7 @@ const MENU_GROUPS: MenuGroup[] = [
     roles: ["ADMIN"],
     children: [
       { label: "Banner 管理", href: "/dashboard/banners", icon: ImageIcon },
+      { label: "头像框管理", href: "/dashboard/avatar-frames", icon: Sparkles },
       { label: "用户管理", href: "/dashboard/users", icon: Users },
       { label: "排行榜", href: "/dashboard/rankings", icon: TrendingUp },
       { label: "搜索同义词", href: "/dashboard/search-synonyms", icon: SearchIcon },
