@@ -80,6 +80,8 @@ export function SongFormDialog({
   const [submitting, setSubmitting] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
+  // 新歌手名字 (无主页的虚拟歌手), 提交时作为 artistNames
+  const [newArtistNames, setNewArtistNames] = useState<string[]>([]);
   // 音频元信息解析状态
   const [parsing, setParsing] = useState(false);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
@@ -115,10 +117,13 @@ export function SongFormDialog({
       });
       setSelectedTagIds(editing.tags?.map((t) => t.id) ?? []);
       setSelectedArtistIds(editing.songArtists?.map((sa) => sa.artist.id) ?? []);
+      // 编辑回显时歌手均已建档 (含虚拟歌手), 无待建新名字
+      setNewArtistNames([]);
     } else {
       form.reset(getDefaultSongFormValues());
       setSelectedTagIds([]);
       setSelectedArtistIds([]);
+      setNewArtistNames([]);
     }
   }, [open, editing, form]);
 
@@ -186,6 +191,7 @@ export function SongFormDialog({
         albumId: values.albumId === NO_ALBUM ? null : values.albumId,
         tagIds: selectedTagIds,
         artistIds: selectedArtistIds,
+        artistNames: newArtistNames,
       };
       if (editing) {
         await request({
@@ -409,10 +415,12 @@ export function SongFormDialog({
                 onToggle={toggleTag}
               />
 
-              {/* 歌手多选 */}
+              {/* 歌手多选 / 输入仅署名的新歌手名 */}
               <ArtistSelector
                 selectedIds={selectedArtistIds}
                 onSelectedChange={setSelectedArtistIds}
+                newNames={newArtistNames}
+                onNewNamesChange={setNewArtistNames}
                 artists={artists}
               />
 

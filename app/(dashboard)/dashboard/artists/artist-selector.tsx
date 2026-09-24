@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, X, User } from "lucide-react";
+import { Search, X, User, Plus } from "lucide-react";
 
 import { request } from "@/lib/api";
 import type { Artist, PageResult } from "@/lib/types";
@@ -20,14 +20,20 @@ import { cn, resolveMediaUrl } from "@/lib/utils";
 export interface ArtistSelectorProps {
   selectedIds: string[];
   onSelectedChange: (ids: string[]) => void;
+  /** 新歌手名字 (无歌手主页, 仅在歌曲信息署名), 提交时作为 artistNames */
+  newNames?: string[];
+  onNewNamesChange?: (names: string[]) => void;
   artists?: Artist[];
 }
 
 export function ArtistSelector({
   selectedIds,
   onSelectedChange,
+  newNames = [],
+  onNewNamesChange,
   artists: initialArtists = [],
 }: ArtistSelectorProps) {
+  const [newNameInput, setNewNameInput] = useState("");
   const [open, setOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -87,6 +93,24 @@ export function ArtistSelector({
     }
   }
 
+  // 添加仅署名的新歌手名: 去空、去重 (名字间及与已选歌手间)
+  function addNewName(raw?: string) {
+    const name = (raw ?? newNameInput).trim();
+    if (!name) return;
+    const lower = name.toLowerCase();
+    const dupName =
+      newNames.some((n) => n.toLowerCase() === lower) ||
+      selectedArtists.some((a) => a.name.toLowerCase() === lower);
+    if (!dupName) {
+      onNewNamesChange?.([...newNames, name]);
+    }
+    setNewNameInput("");
+  }
+
+  function removeNewName(name: string) {
+    onNewNamesChange?.(newNames.filter((n) => n !== name));
+  }
+
   function handleLoadMore() {
     if (!loading && list.length < total) {
       setPage((p) => p + 1);
@@ -104,49 +128,90 @@ export function ArtistSelector({
             size="sm"
             onClick={() => setOpen(true)}
           >
-            选择歌手
+            选择已有歌手
           </Button>
         </div>
         <div className="flex flex-wrap gap-2 rounded-md border border-input p-3 min-h-[42px]">
-          {selectedArtists.length === 0 ? (
-            <span className="text-sm text-muted-foreground">请选择歌手</span>
-          ) : (
-            selectedArtists.map((artist) => (
-              <span
-                key={artist.id}
-                className="flex items-center gap-1.5 rounded-md bg-primary-50 px-2.5 py-1 text-sm text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+          {selectedArtists.map((artist) => (
+            <span
+              key={artist.id}
+              className="flex items-center gap-1.5 rounded-md bg-primary-50 px-2.5 py-1 text-sm text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+            >
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted">
+                {artist.avatar ? (
+                  <img
+                    src={resolveMediaUrl(artist.avatar)}
+                    alt={artist.name}
+                    className="h-full w-full rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-3 w-3 text-muted-foreground" />
+                )}
+              </div>
+              {artist.name}
+              <button
+                type="button"
+                onClick={() => toggleSelect(artist.id)}
+                className="ml-0.5 rounded hover:bg-primary-200/50 dark:hover:bg-primary-800/50"
               >
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted">
-                  {artist.avatar ? (
-                    <img
-                      src={resolveMediaUrl(artist.avatar)}
-                      alt={artist.name}
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <User className="h-3 w-3 text-muted-foreground" />
-                  )}
-                </div>
-                {artist.name}
-                <button
-                  type="button"
-                  onClick={() => toggleSelect(artist.id)}
-                  className="ml-0.5 rounded hover:bg-primary-200/50 dark:hover:bg-primary-800/50"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {newNames.map((name) => (
+            <span
+              key={name}
+              title="仅署名歌手, 无公开主页"
+              className="flex items-center gap-1.5 rounded-md border border-dashed border-amber-400 bg-amber-50 px-2.5 py-1 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+            >
+              <User className="h-3 w-3" />
+              {name}
+              <button
+                type="button"
+                onClick={() => removeNewName(name)}
+                className="ml-0.5 rounded hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {selectedArtists.length === 0 && newNames.length === 0 && (
+            <span className="text-sm text-muted-foreground">请选择歌手</span>
           )}
+        </div>
+        {/* 直接输入新歌手名: 自动建为无主页的虚拟歌手, 只在歌曲信息显示名字 */}
+        <div className="flex gap-2">
+          <Input
+            value={newNameInput}
+            onChange={(e) => setNewNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addNewName();
+              }
+            }}
+            placeholder="输入新歌手名字（无歌手页，仅显示名字）"
+            className="h-9 flex-1"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => addNewName()}
+            disabled={!newNameInput.trim()}
+          >
+            <Plus className="h-4 w-4" />
+            添加
+          </Button>
         </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[80vh] max-w-lg overflow-hidden">
           <DialogHeader>
-            <DialogTitle>选择歌手</DialogTitle>
+            <DialogTitle>选择已有歌手</DialogTitle>
             <DialogDescription>
-              已选择 {selectedIds.length} 位歌手
+              已选择 {selectedIds.length} 位歌手{newNames.length > 0 ? `，${newNames.length} 个新名字` : ""}；新名字可直接在下方输入框添加
             </DialogDescription>
           </DialogHeader>
 
@@ -198,15 +263,22 @@ export function ArtistSelector({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={cn(
-                    "font-medium",
+                    "flex items-center gap-1.5 font-medium",
                     selectedIds.includes(artist.id)
                       ? "text-primary-700 dark:text-primary-300"
                       : ""
                   )}>
-                    {artist.name}
+                    <span className="truncate">{artist.name}</span>
+                    {artist.hasHomepage === false && (
+                      <span className="shrink-0 rounded border border-amber-400 px-1 text-[10px] font-normal leading-4 text-amber-600 dark:text-amber-400">
+                        仅署名
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {artist.representativeWorks || "暂无代表作"}
+                    {artist.hasHomepage === false
+                      ? "无歌手页，仅在歌曲信息显示名字"
+                      : artist.representativeWorks || "暂无代表作"}
                   </p>
                 </div>
                 <div className={cn(
@@ -244,6 +316,18 @@ export function ArtistSelector({
                 <p className="mt-2 text-sm text-muted-foreground">
                   {searchKeyword ? "未找到匹配的歌手" : "暂无歌手"}
                 </p>
+                {searchKeyword.trim() && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => addNewName(searchKeyword)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    将「{searchKeyword.trim()}」作为新歌手名添加
+                  </Button>
+                )}
               </div>
             )}
           </div>

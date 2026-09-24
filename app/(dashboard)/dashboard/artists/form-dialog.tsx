@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 import {
   artistSchema,
@@ -74,6 +75,7 @@ export function ArtistFormDialog({
             avatar: detail.avatar || "",
             bio: detail.bio || "",
             representativeWorks: detail.representativeWorks || "",
+            hasHomepage: detail.hasHomepage ?? true,
           });
           if (detail.songArtists) {
             setSelectedSongIds(
@@ -89,6 +91,7 @@ export function ArtistFormDialog({
             avatar: editing.avatar || "",
             bio: editing.bio || "",
             representativeWorks: editing.representativeWorks || "",
+            hasHomepage: editing.hasHomepage ?? true,
           });
         })
         .finally(() => setLoadingDetail(false));
@@ -206,6 +209,27 @@ export function ArtistFormDialog({
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="hasHomepage"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-md border p-3">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-sm">拥有公开歌手主页</FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      关闭后为「仅署名」歌手：不出现在公开歌手列表与搜索，客户端歌手名不可点击，只在歌曲信息显示名字；重新打开即为转正
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

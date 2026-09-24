@@ -7,6 +7,8 @@ export const artistSchema = z.object({
   avatar: z.string().optional(),
   bio: z.string().optional(),
   representativeWorks: z.string().optional(),
+  /** 是否拥有公开歌手主页: false=仅署名虚拟歌手; 打开即"转正" */
+  hasHomepage: z.boolean(),
 });
 
 export type ArtistFormValues = z.infer<typeof artistSchema>;
@@ -17,5 +19,6 @@ export function getDefaultArtistFormValues(): ArtistFormValues {
     avatar: "",
     bio: "",
     representativeWorks: "",
+    hasHomepage: true,
   };
 }

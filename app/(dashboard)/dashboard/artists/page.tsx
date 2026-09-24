@@ -125,7 +125,17 @@ export default function ArtistsPage() {
       title: "歌手名称",
       key: "name",
       render: (artist: Artist) => (
-        <span className="font-medium">{artist.name}</span>
+        <span className="flex items-center gap-2">
+          <span className="font-medium">{artist.name}</span>
+          {artist.hasHomepage === false && (
+            <span
+              title="无歌手页，仅在歌曲信息显示名字"
+              className="rounded border border-amber-400 px-1.5 py-0.5 text-xs text-amber-600 dark:text-amber-400"
+            >
+              仅署名
+            </span>
+          )}
+        </span>
       ),
     },
     {

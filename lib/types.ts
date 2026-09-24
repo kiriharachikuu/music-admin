@@ -78,6 +78,8 @@ export interface Artist {
   avatar?: string | null;
   bio?: string | null;
   representativeWorks?: string | null;
+  /** 是否拥有公开歌手主页: false=仅署名的虚拟歌手, 只在歌曲信息显示名字 */
+  hasHomepage?: boolean;
   createdAt: string;
   updatedAt: string;
   songArtists?: { artist?: Artist; song?: { id: string; title: string } }[];
